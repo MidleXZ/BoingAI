@@ -116,11 +116,22 @@ jobs:
       - name: Build C++ text library
         working-directory: boingai/cpp-lib
         shell: cmd
-        run: cl /nologo /LD /O2 /EHsc /std:c++17 /Iinclude src\boing_text.cpp /Fe:boing_text.dll /link /IMPLIB:boing_text.lib
+        run: |
+          cl /nologo /LD /O2 /EHsc /std:c++17 /Iinclude src\boing_text.cpp /Fe:boing_text.dll /link /IMPLIB:boing_text.lib
+          if errorlevel 1 exit /b 1
+          if not exist boing_text.lib (echo ERROR: boing_text.lib was not produced & exit /b 1)
+          if not exist boing_text.dll (echo ERROR: boing_text.dll was not produced & exit /b 1)
+          dumpbin /nologo /exports boing_text.dll | findstr /C:"boing_"
+          if errorlevel 1 (echo ERROR: boing_text.dll exports no boing_* symbols & exit /b 1)
+          dir boing_text.*
 
       - name: Build Rust backend
         working-directory: boingai/rust-server
         run: cargo build --release
+
+      - name: Copy text library next to backend binary
+        shell: cmd
+        run: copy /Y boingai\cpp-lib\boing_text.dll boingai\rust-server\target\release\
 
       - name: Publish C# memory service
         run: >

@@ -55,6 +55,161 @@ struct ChatRequest {
     temperature: Option<f32>,
     #[serde(default)]
     top_p: Option<f32>,
+    #[serde(default)]
+    web_search: bool,
+}
+
+// ----- Web search (DuckDuckGo HTML, no API key required) -----
+
+#[derive(Deserialize)]
+struct SearchRequest {
+    query: String,
+    #[serde(default)]
+    limit: Option<usize>,
+}
+
+#[derive(Serialize)]
+struct SearchResult {
+    title: String,
+    url: String,
+    snippet: String,
+}
+
+fn html_decode(s: &str) -> String {
+    // Decode &amp; last so "&amp;lt;" does not accidentally become "<".
+    let out = s
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&#x27;", "'")
+        .replace("&nbsp;", " ");
+    out.replace("&amp;", "&")
+}
+
+/// Parse DuckDuckGo's HTML results page into structured results.
+fn parse_ddg_results(html: &str, limit: usize) -> Vec<SearchResult> {
+    let marker = "class=\"result__a\"";
+    let mut results = Vec::new();
+    let mut pos = 0usize;
+
+    while results.len() < limit {
+        let Some(start) = html[pos..].find(marker) else { break; };
+        let abs = pos + start;
+
+        // A result block ends where the next result anchor starts (or end of page).
+        let block_end = html[abs + marker.len()..]
+            .find(marker)
+            .map(|n| abs + marker.len() + n)
+            .unwrap_or(html.len());
+        let block = &html[abs..block_end];
+
+        // DuckDuckGo wraps links: //duckduckgo.com/l/?uddg=<encoded target>
+        let Some(href_pos) = block.find("href=\"") else {
+            pos = block_end;
+            continue;
+        };
+        let href_start = href_pos + 6;
+        let Some(href_end) = block[href_start..].find('"') else {
+            pos = block_end;
+            continue;
+        };
+        let raw_url = &block[href_start..href_start + href_end];
+        let clean_url = if let Some(qpos) = raw_url.find("uddg=") {
+            let rest = &raw_url[qpos + 5..];
+            let amp = rest.find('&').unwrap_or(rest.len());
+            urlencoding::decode(&rest[..amp])
+                .map(|c| c.into_owned())
+                .unwrap_or_else(|_| raw_url.to_string())
+        } else {
+            raw_url.to_string()
+        };
+
+        // Title is the text inside the anchor's opening tag.
+        let title = match block.find('>') {
+            Some(t) => {
+                let from = t + 1;
+                let to = block[from..].find('<').map(|e| from + e).unwrap_or(block.len());
+                html_decode(block[from..to].trim())
+            }
+            None => String::new(),
+        };
+
+        // Snippet lives in a result__snippet element within this block.
+        let snippet = block
+            .find("class=\"result__snippet\"")
+            .and_then(|spos| {
+                let start = block[spos..].find('>')? + spos + 1;
+                let end = block[start..].find('<')? + start;
+                Some(html_decode(block[start..end].trim()))
+            })
+            .unwrap_or_default();
+
+        if !title.is_empty() && !clean_url.is_empty() {
+            results.push(SearchResult { title, url: clean_url, snippet });
+        }
+        pos = block_end;
+    }
+
+    results
+}
+
+async fn duckduckgo_search(
+    client: &reqwest::Client,
+    query: &str,
+    limit: usize,
+) -> Vec<SearchResult> {
+    let url = format!(
+        "https://html.duckduckgo.com/html/?q={}",
+        urlencoding::encode(query)
+    );
+
+    let resp = match client
+        .get(&url)
+        .header(
+            reqwest::header::USER_AGENT,
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+        )
+        .send()
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::warn!("web search request failed: {e}");
+            return vec![];
+        }
+    };
+
+    let html = match resp.text().await {
+        Ok(h) => h,
+        Err(e) => {
+            tracing::warn!("web search body failed: {e}");
+            return vec![];
+        }
+    };
+
+    parse_ddg_results(&html, limit)
+}
+
+async fn web_search(State(s): State<Arc<AppState>>, Json(req): Json<SearchRequest>) -> Response {
+    let limit = req.limit.unwrap_or(5).clamp(1, 10);
+    let results = duckduckgo_search(&s.http, &req.query, limit).await;
+    Json(serde_json::json!({
+        "query": req.query,
+        "results": results,
+    })).into_response()
+}
+
+fn search_context(results: &[SearchResult]) -> String {
+    if results.is_empty() {
+        return String::new();
+    }
+    let mut ctx = String::from("\n\nHere is information from web search results you can use to answer:\n");
+    for (i, r) in results.iter().enumerate() {
+        ctx.push_str(&format!("[{}] Title: {}\nURL: {}\nSnippet: {}\n\n", i + 1, r.title, r.url, r.snippet));
+    }
+    ctx.push_str("Use the above web search results to inform your answer. Cite sources by URL when helpful.\n");
+    ctx
 }
 
 #[derive(Serialize)]
@@ -169,6 +324,16 @@ async fn chat(State(s): State<Arc<AppState>>, Json(req): Json<ChatRequest>) -> R
     let user_text = cpp_sanitize(&req.message);
     let tokens_in = cpp_tokens(&user_text);
 
+    // Optional web search: prepend results to the system prompt
+    let sys = if req.web_search {
+        let limit = 5usize;
+        let results = duckduckgo_search(&s.http, &user_text, limit).await;
+        let base = req.system_prompt.clone().unwrap_or_else(|| "You are BoingAI, a helpful, concise and friendly assistant. Keep answers clear and minimal.".to_string());
+        base + &search_context(&results)
+    } else {
+        req.system_prompt.clone().unwrap_or_else(|| "You are BoingAI, a helpful, concise and friendly assistant. Keep answers clear and minimal.".to_string())
+    };
+
     // Resolve conversation id
     let conv_id = match req.conversation_id.clone() {
         Some(id) => id,
@@ -194,7 +359,6 @@ async fn chat(State(s): State<Arc<AppState>>, Json(req): Json<ChatRequest>) -> R
     // fetch history
     let hist_url = format!("{}/conversations/{}", s.csharp_url, conv_id);
     let mut messages: Vec<serde_json::Value> = Vec::new();
-    let sys = req.system_prompt.clone().unwrap_or_else(|| "You are BoingAI, a helpful, concise and friendly assistant. Keep answers clear and minimal.".to_string());
     messages.push(serde_json::json!({
         "role": "system",
         "content": sys
@@ -254,6 +418,16 @@ async fn chat_stream(
     let user_text = cpp_sanitize(&req.message);
     let tokens_in = cpp_tokens(&user_text);
 
+    // Optional web search: prepend results to the system prompt
+    let sys = if req.web_search {
+        let limit = 5usize;
+        let results = duckduckgo_search(&s.http, &user_text, limit).await;
+        let base = req.system_prompt.clone().unwrap_or_else(|| "You are BoingAI, a helpful, concise and friendly assistant. Keep answers clear and minimal.".to_string());
+        base + &search_context(&results)
+    } else {
+        req.system_prompt.clone().unwrap_or_else(|| "You are BoingAI, a helpful, concise and friendly assistant. Keep answers clear and minimal.".to_string())
+    };
+
     // Resolve conversation id
     let conv_id = match req.conversation_id.clone() {
         Some(id) => id,
@@ -281,7 +455,6 @@ async fn chat_stream(
     // fetch history
     let hist_url = format!("{}/conversations/{}", s.csharp_url, conv_id);
     let mut messages: Vec<serde_json::Value> = Vec::new();
-    let sys = req.system_prompt.clone().unwrap_or_else(|| "You are BoingAI, a helpful, concise and friendly assistant. Keep answers clear and minimal.".to_string());
     messages.push(serde_json::json!({
         "role": "system",
         "content": sys
@@ -378,6 +551,7 @@ async fn main() {
         .route("/api/conversations/:id", get(get_conversation).delete(delete_conversation))
         .route("/api/chat", post(chat))
         .route("/api/chat/stream", post(chat_stream))
+        .route("/api/search", post(web_search))
         .route("/api/window/minimize", post(window_minimize))
         .route("/api/window/close", post(window_close))
         .nest_service("/static", ServeDir::new(&frontend_dir))
@@ -385,7 +559,11 @@ async fn main() {
         .layer(CorsLayer::permissive())
         .with_state(state);
 
-    let addr = "0.0.0.0:8080";
+    let port: u16 = std::env::var("PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(8080);
+    let addr = format!("0.0.0.0:{port}");
     println!("BoingAI server listening on http://{}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();

@@ -22,6 +22,8 @@ let abortController = null;
 const stopBtn = document.getElementById('stopBtn');
 let conversationsCache = [];
 let searchQuery = '';
+let webSearchEnabled = false;
+const webSearchBtn = $('#webSearchBtn');
 
 // ---------- Theme ----------
 function applyTheme(t) {
@@ -473,6 +475,7 @@ async function sendMessage(text) {
       system_prompt: getSystemPrompt(),
       temperature: parseFloat(localStorage.getItem('boing-temp') || '0.7'),
       top_p: parseFloat(localStorage.getItem('boing-topp') || '0.9'),
+      web_search: webSearchEnabled,
     }),
       signal: abortController.signal,
     });
@@ -603,7 +606,7 @@ async function regenerateLast() {
     const r = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ conversation_id: currentConvId, message: userText }),
+      body: JSON.stringify({ conversation_id: currentConvId, message: userText, web_search: webSearchEnabled }),
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
@@ -631,6 +634,13 @@ inputEl.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(inputEl.value); }
 });
 inputEl.addEventListener('input', autoResize);
+
+webSearchBtn.addEventListener('click', () => {
+  webSearchEnabled = !webSearchEnabled;
+  webSearchBtn.style.opacity = webSearchEnabled ? '1' : '0.5';
+  webSearchBtn.setAttribute('aria-pressed', String(webSearchEnabled));
+  toast('Web search ' + (webSearchEnabled ? 'on' : 'off'));
+});
 
 $$('.suggestion').forEach(b => {
   b.addEventListener('click', () => sendMessage(b.dataset.text));
