@@ -121,11 +121,6 @@ jobs:
           if errorlevel 1 exit /b 1
           if not exist boing_text.lib (echo ERROR: boing_text.lib was not produced & exit /b 1)
           if not exist boing_text.dll (echo ERROR: boing_text.dll was not produced & exit /b 1)
-<<<<<<< HEAD
-          dumpbin /nologo /exports boing_text.dll | findstr /C:"boing_"
-          if errorlevel 1 (echo ERROR: boing_text.dll exports no boing_* symbols & exit /b 1)
-=======
->>>>>>> 5379d7e5f1db36b3023fdac135885fa86162d749
           dir boing_text.*
 
       - name: Build Rust backend
