@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+desktop/node_modules/
+
+# Build output
+desktop/dist/
+desktop/resources/
+staging/
+boingai/rust-server/target/
+boingai/csharp-service/bin/
+boingai/csharp-service/obj/
+boingai/cpp-lib/*.so
+boingai/cpp-lib/*.dylib
+boingai/cpp-lib/*.dll
+boingai/cpp-lib/*.lib
+
+# Local logs / caches
+*.log
+.DS_Store

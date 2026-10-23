@@ -1,0 +1,77 @@
+{
+  "name": "boingai-desktop",
+  "version": "1.0.0",
+  "description": "BoingAI desktop",
+  "author": "BoingAI",
+  "license": "MIT",
+  "homepage": "https://boingai.app",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "dist": "electron-builder",
+    "dist:linux": "electron-builder --linux deb rpm",
+    "dist:win": "electron-builder --win nsis",
+    "dist:mac": "electron-builder --mac dmg pkg"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.boingai.app",
+    "productName": "BoingAI",
+    "copyright": "Copyright © 2026 BoingAI",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/boingai",
+        "to": "boingai"
+      }
+    ],
+    "linux": {
+      "target": [
+        "deb",
+        "rpm"
+      ],
+      "category": "Utility",
+      "icon": "build/icon.png",
+      "maintainer": "BoingAI <hello@boingai.local>",
+      "artifactName": "BoingAI-${version}-${arch}.${ext}"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.png",
+      "artifactName": "BoingAI-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "pkg"
+      ],
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.png",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "artifactName": "BoingAI-${version}-${arch}.${ext}"
+    }
+  }
+}

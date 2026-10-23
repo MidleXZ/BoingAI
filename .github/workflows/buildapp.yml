@@ -1,0 +1,217 @@
+name: Build App Installers
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux:
+    name: Linux (.deb + .rpm)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: boingai/rust-server -> target
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm fakeroot
+
+      - name: Build C++ text library
+        working-directory: boingai/cpp-lib
+        run: make
+
+      - name: Build Rust backend
+        working-directory: boingai/rust-server
+        run: cargo build --release
+
+      - name: Publish C# memory service
+        run: >
+          dotnet publish boingai/csharp-service/csharp-service.csproj
+          -c Release -r linux-x64 --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -o staging/csharp
+
+      - name: Stage bundled resources
+        run: node .github/scripts/stage-resources.js linux
+
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm install --no-audit --no-fund
+
+      - name: Build .deb and .rpm
+        working-directory: desktop
+        run: npx electron-builder --linux deb rpm --publish never
+
+      - name: Upload Linux installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: boingai-linux
+          if-no-files-found: error
+          path: |
+            desktop/dist/*.deb
+            desktop/dist/*.rpm
+
+  windows:
+    name: Windows (installer .exe)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: boingai/rust-server -> target
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Build C++ text library
+        working-directory: boingai/cpp-lib
+        shell: cmd
+        run: cl /nologo /LD /O2 /EHsc /std:c++17 /Iinclude src\boing_text.cpp /Fe:boing_text.dll /link /IMPLIB:boing_text.lib
+
+      - name: Build Rust backend
+        working-directory: boingai/rust-server
+        run: cargo build --release
+
+      - name: Publish C# memory service
+        run: >
+          dotnet publish boingai/csharp-service/csharp-service.csproj
+          -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -o staging/csharp
+
+      - name: Stage bundled resources
+        run: node .github/scripts/stage-resources.js win
+
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm install --no-audit --no-fund
+
+      - name: Build NSIS installer
+        working-directory: desktop
+        run: npx electron-builder --win nsis --publish never
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: boingai-windows
+          if-no-files-found: error
+          path: desktop/dist/*.exe
+
+  macos:
+    name: macOS (.app + .dmg + .pkg)
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: boingai/rust-server -> target
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Build C++ text library
+        working-directory: boingai/cpp-lib
+        run: |
+          clang++ -O2 -fPIC -std=c++17 -Iinclude -dynamiclib \
+            -install_name @loader_path/libboing_text.dylib \
+            -o libboing_text.dylib src/boing_text.cpp
+
+      - name: Build Rust backend
+        working-directory: boingai/rust-server
+        run: cargo build --release
+
+      - name: Publish C# memory service
+        run: >
+          dotnet publish boingai/csharp-service/csharp-service.csproj
+          -c Release -r osx-arm64 --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -o staging/csharp
+
+      - name: Stage bundled resources
+        run: node .github/scripts/stage-resources.js mac
+
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm install --no-audit --no-fund
+
+      - name: Build .dmg and .pkg
+        working-directory: desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npx electron-builder --mac dmg pkg --publish never
+
+      - name: Upload macOS installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: boingai-macos
+          if-no-files-found: error
+          path: |
+            desktop/dist/*.dmg
+            desktop/dist/*.pkg
