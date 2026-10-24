@@ -37,13 +37,13 @@ function applyTheme(t) {
   applyTheme(saved || (prefersDark ? 'dark' : 'light'));
 })();
 themeBtn.addEventListener('click', () => {
-  const cur = document.documentElement.getAttribute('data-theme');
+  const cur = document.documentElement.getAttribute('data-theme') || 'dark';
   const next = cur === 'dark' ? 'light' : 'dark';
   applyTheme(next);
   localStorage.setItem('boing-theme-mode', next);
   const btns = document.querySelectorAll('#themeSeg .seg-btn');
   btns.forEach(b => b.classList.toggle('active', b.dataset.val === next));
-  updateSwatchColors();
+  if (typeof updateSwatchColors === 'function') updateSwatchColors();
 });
 
 // ---------- Toast ----------
@@ -859,15 +859,15 @@ shortcutsClose.addEventListener('click', closeShortcuts);
 shortcutsBackdrop.addEventListener('click', closeShortcuts);
 
 // settings modal
-const settingsBtn = $('#settingsBtn');
-const settingsModal = $('#settingsModal');
-const settingsBackdrop = $('#settingsBackdrop');
-const settingsClose = $('#settingsClose');
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsModal = document.getElementById('settingsModal');
+const settingsBackdrop = document.getElementById('settingsBackdrop');
+const settingsClose = document.getElementById('settingsClose');
 function openSettings() {
-  settingsBackdrop.classList.add('show');
-  settingsModal.classList.add('show');
+  if(settingsBackdrop) settingsBackdrop.classList.add('show');
+  if(settingsModal) settingsModal.classList.add('show');
   // default tab
-  switchSettingsTab('appearance');
+  if(typeof switchSettingsTab === 'function') switchSettingsTab('appearance');
 }
 function switchSettingsTab(tab) {
   document.querySelectorAll('.settings-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
@@ -876,15 +876,18 @@ function switchSettingsTab(tab) {
   });
 }
 document.querySelectorAll('.settings-tab').forEach(t => {
-  t.addEventListener('click', () => switchSettingsTab(t.dataset.tab));
+  t.addEventListener('click', () => { if(typeof switchSettingsTab === 'function') switchSettingsTab(t.dataset.tab); });
 });
 function closeSettings() {
-  settingsBackdrop.classList.remove('show');
-  settingsModal.classList.remove('show');
+  if(settingsBackdrop) settingsBackdrop.classList.remove('show');
+  if(settingsModal) settingsModal.classList.remove('show');
 }
-settingsBtn.addEventListener('click', openSettings);
-settingsClose.addEventListener('click', closeSettings);
-settingsBackdrop.addEventListener('click', closeSettings);
+if(settingsBtn) {
+  settingsBtn.onclick = openSettings;
+  settingsBtn.addEventListener('click', openSettings);
+}
+if(settingsClose) settingsClose.addEventListener('click', closeSettings);
+if(settingsBackdrop) settingsBackdrop.addEventListener('click', closeSettings);
 
 // system theme listener
 if (window.matchMedia) {
@@ -1351,7 +1354,7 @@ clearAllBtn.addEventListener('click', async () => {
   toast('All cleared');
 });
 
-// ---------- Mode (normal / coding) ----------
+// ---------- Mode (normal / coding / thinking) ----------
 const modeSeg = $('#modeSeg');
 const modeSuggestions = {
   normal: [
@@ -1373,19 +1376,15 @@ const modeSuggestions = {
     { icon: '🔍', text: 'Analyze trade-offs', prompt: 'Analyze the trade-offs between two approaches in depth.' },
     { icon: '🧩', text: 'Debug complex bug', prompt: 'Walk through debugging a complex, multi-layer bug step by step.' },
   ],
-  flash: [
-    { icon: '⚡', text: 'Quick answer', prompt: 'Give a one-sentence answer.' },
-    { icon: '📝', text: 'Summarize', prompt: 'Summarize in 3 bullet points.' },
-    { icon: '✅', text: 'Yes or no', prompt: 'Answer yes or no with a short reason.' },
-  ],
 };
 
 function getMode() { return localStorage.getItem('boing-mode') || 'normal'; }
 function setMode(mode) {
+  if (!['normal', 'coding', 'thinking'].includes(mode)) mode = 'normal';
   localStorage.setItem('boing-mode', mode);
   document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
   renderSuggestions();
-  const names = { normal: 'Normal mode', coding: 'Coding mode', thinking: 'Thinking mode', flash: 'Flash mode' };
+  const names = { normal: 'Normal mode', coding: 'Coding mode', thinking: 'Thinking mode' };
   toast(names[mode] || (mode + ' mode'));
 }
 
@@ -1411,10 +1410,8 @@ function getSystemPrompt() {
     ? 'You are BoingAI, an expert software engineer and UI/UX designer. You can write code in any programming language (Rust, C++, C#, Python, JavaScript, TypeScript, Go, Java, etc.). You produce clean, well-structured, production-ready code. You excel at creating beautiful, modern, accessible user interfaces. When asked to create a UI, generate complete HTML/CSS/JS with attention to typography, spacing, color, responsiveness, and micro-interactions. Use markdown with fenced code blocks and specify the language. Be concise but thorough.'
     : mode === 'thinking'
     ? 'You are BoingAI. Think step by step and deeply. Break the problem down, reason carefully, consider alternatives and edge cases, then give a clear, well-justified final answer. Show your reasoning briefly.'
-    : mode === 'flash'
-    ? 'You are BoingAI. Reply extremely fast and concise. One to three short sentences max. No fluff, no markdown beyond basics.'
     : 'You are BoingAI, a helpful, concise and friendly assistant. Keep answers clear and minimal.';
-  return custom ? base + '\\n\\nAdditional instructions: ' + custom : base;
+  return custom ? base + '\n\nAdditional instructions: ' + custom : base;
 }
 
 // wire mode seg
@@ -2022,3 +2019,17 @@ const _origSlash = window.handleSlash;
   });
   if (input) input.addEventListener('keydown', (e) => { if (e.key === 'Enter') btn.click(); });
 })();
+
+// Fallback settings button listener
+document.addEventListener('click', function(e) {
+  if (e.target.closest('#settingsBtn')) {
+    const backdrop = document.getElementById('settingsBackdrop');
+    const modal = document.getElementById('settingsModal');
+    if (backdrop) backdrop.classList.add('show');
+    if (modal) modal.classList.add('show');
+  }
+  if (e.target.closest('#settingsClose') || e.target.id === 'settingsBackdrop') {
+    document.getElementById('settingsBackdrop')?.classList.remove('show');
+    document.getElementById('settingsModal')?.classList.remove('show');
+  }
+});

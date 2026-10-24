@@ -1,6 +1,6 @@
 # BoingAI
 
-A minimal, polished AI chat application powered by **Qwen 2.5 1.5B Instruct**, running locally via Ollama.
+A minimal, polished AI chat application powered by **MiniCPM-V 4.6 1B** (`minicpm-v4.6:1b`), running locally via Ollama.
 
 BoingAI is built across four languages, each with a distinct responsibility:
 

@@ -1,8 +1,11 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const { spawn } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const http = require('http');
+
+const MIN_FREE_RAM_BYTES = 3 * 1024 * 1024 * 1024;
 
 const isWin = process.platform === 'win32';
 const isMac = process.platform === 'darwin';
@@ -120,7 +123,32 @@ function createWindow() {
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
+function formatGb(bytes) {
+  return (bytes / (1024 ** 3)).toFixed(1);
+}
+
+function hasEnoughFreeRam() {
+  const freeBytes = os.freemem();
+  if (freeBytes >= MIN_FREE_RAM_BYTES) return true;
+
+  dialog.showMessageBoxSync({
+    type: 'error',
+    title: 'Not enough free memory',
+    message: 'You cannot use BoingAI right now.',
+    detail: `BoingAI needs at least 3 GB of free RAM to run. You currently have ${formatGb(freeBytes)} GB free.\n\nClose some applications and try again.`,
+    buttons: ['OK'],
+    defaultId: 0,
+    noLink: true,
+  });
+  return false;
+}
+
 app.whenReady().then(async () => {
+  if (!hasEnoughFreeRam()) {
+    app.quit();
+    return;
+  }
+
   await startServices();
   await waitForServer();
   createWindow();
