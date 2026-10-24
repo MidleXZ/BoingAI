@@ -1309,6 +1309,16 @@ const modeSuggestions = {
     { icon: '🦀', text: 'Rust HTTP server', prompt: 'Write a minimal HTTP server in Rust using axum.' },
     { icon: '🗄️', text: 'SQL query help', prompt: 'Explain SQL joins with examples.' },
   ],
+  thinking: [
+    { icon: '🧠', text: 'Solve a hard problem', prompt: 'Think step by step and solve a complex reasoning problem.' },
+    { icon: '🔍', text: 'Analyze trade-offs', prompt: 'Analyze the trade-offs between two approaches in depth.' },
+    { icon: '🧩', text: 'Debug complex bug', prompt: 'Walk through debugging a complex, multi-layer bug step by step.' },
+  ],
+  flash: [
+    { icon: '⚡', text: 'Quick answer', prompt: 'Give a one-sentence answer.' },
+    { icon: '📝', text: 'Summarize', prompt: 'Summarize in 3 bullet points.' },
+    { icon: '✅', text: 'Yes or no', prompt: 'Answer yes or no with a short reason.' },
+  ],
 };
 
 function getMode() { return localStorage.getItem('boing-mode') || 'normal'; }
@@ -1316,7 +1326,8 @@ function setMode(mode) {
   localStorage.setItem('boing-mode', mode);
   document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
   renderSuggestions();
-  toast(mode === 'coding' ? 'Coding mode' : 'Normal mode');
+  const names = { normal: 'Normal mode', coding: 'Coding mode', thinking: 'Thinking mode', flash: 'Flash mode' };
+  toast(names[mode] || (mode + ' mode'));
 }
 
 function renderSuggestions() {
@@ -1339,6 +1350,10 @@ function getSystemPrompt() {
   const mode = getMode();
   const base = mode === 'coding'
     ? 'You are BoingAI, an expert software engineer and UI/UX designer. You can write code in any programming language (Rust, C++, C#, Python, JavaScript, TypeScript, Go, Java, etc.). You produce clean, well-structured, production-ready code. You excel at creating beautiful, modern, accessible user interfaces. When asked to create a UI, generate complete HTML/CSS/JS with attention to typography, spacing, color, responsiveness, and micro-interactions. Use markdown with fenced code blocks and specify the language. Be concise but thorough.'
+    : mode === 'thinking'
+    ? 'You are BoingAI. Think step by step and deeply. Break the problem down, reason carefully, consider alternatives and edge cases, then give a clear, well-justified final answer. Show your reasoning briefly.'
+    : mode === 'flash'
+    ? 'You are BoingAI. Reply extremely fast and concise. One to three short sentences max. No fluff, no markdown beyond basics.'
     : 'You are BoingAI, a helpful, concise and friendly assistant. Keep answers clear and minimal.';
   return custom ? base + '\\n\\nAdditional instructions: ' + custom : base;
 }
