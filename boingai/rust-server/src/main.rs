@@ -731,7 +731,7 @@ async fn main() {
         http: reqwest::Client::new(),
         ollama_url: std::env::var("OLLAMA_URL").unwrap_or_else(|_| "http://localhost:11434".into()),
         csharp_url: std::env::var("CSHARP_URL").unwrap_or_else(|_| "http://localhost:5001".into()),
-        model: std::env::var("MODEL").unwrap_or_else(|_| "qwen2.5:1.5b".into()),
+        model: std::env::var("MODEL").unwrap_or_else(|_| "minicpm-v".into()),
     });
 
     // frontend dir

@@ -1163,7 +1163,7 @@ document.addEventListener('drop', (e) => {
         const b64 = ev.target.result.split(',')[1];
         pendingImages.push(b64);
         renderImagePreviews();
-        toast('Image attached: ' + file.name + ' (use a vision model like llava for best results)');
+        toast('Image attached: ' + file.name + ' — needs a vision model (llava/moondream). Switch model in settings.');
       };
       reader.readAsDataURL(file);
     } else {
