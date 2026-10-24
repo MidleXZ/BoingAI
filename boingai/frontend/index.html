@@ -72,6 +72,9 @@
           <button class="mode-btn" data-mode="coding">Coding</button>
         </div>
         <div class="topbar-actions">
+          <button class="icon-btn" id="editModeBtn" title="Edit layout" aria-label="Edit layout" style="opacity:0.5;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
           <button class="icon-btn" id="settingsBtn" title="Customize" aria-label="Customize">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
           </button>
@@ -143,6 +146,9 @@
           <button class="icon-btn web-search-btn" id="webSearchBtn" aria-label="Web search" title="Web search" style="opacity:0.5;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
           </button>
+          <button class="icon-btn deep-search-btn" id="deepSearchBtn" aria-label="Deep web search" title="Deep web search (search + read pages)" style="opacity:0.5;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/><path d="M5.6 5.6l12.8 12.8M5.6 18.4l12.8-12.8"/></svg>
+          </button>
           <button class="send-btn" id="sendBtn" aria-label="Send">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
           </button>
@@ -211,11 +217,18 @@
         <button class="settings-tab active" data-tab="appearance">Appearance</button>
         <button class="settings-tab" data-tab="behavior">Behavior</button>
         <button class="settings-tab" data-tab="advanced">Advanced</button>
+        <button class="settings-tab" data-tab="layout">Layout</button>
+        <button class="settings-tab" data-tab="widgets">Widgets</button>
       </div>
 
       <div class="setting-group" data-tab="appearance">
         <label class="setting-label">Accent color</label>
         <div class="swatch-row" id="accentSwatches"></div>
+      </div>
+      <div class="setting-group" data-tab="appearance">
+        <label class="setting-label">Corner radius</label>
+        <input type="range" id="radiusSlider" min="0" max="24" value="10" />
+        <span id="radiusValue">10px</span>
       </div>
       <div class="setting-group" data-tab="appearance">
         <label class="setting-label">Theme</label>
@@ -271,9 +284,36 @@
         <textarea id="systemPromptInput" class="settings-textarea" rows="3" placeholder="You are BoingAI..."></textarea>
         <button class="seg-btn" id="saveSystemPrompt" style="align-self:flex-start;">Save</button>
       </div>
-    </div>
+    
+      <div class="setting-group" data-tab="layout">
+        <label class="setting-label">Drag &amp; drop layout</label>
+        <p class="setting-hint">Toggle edit mode, then drag items to reorder them. Changes are saved automatically.</p>
+        <button class="seg-btn" id="layoutEditModeBtn">Enable edit mode</button>
+        <div class="layout-zones" id="layoutZones">
+          <div class="layout-zone" data-zone="topbar-actions">
+            <span class="layout-zone-title">Top bar actions</span>
+            <div class="layout-zone-items" id="zoneTopbar"></div>
+          </div>
+          <div class="layout-zone" data-zone="footer-actions">
+            <span class="layout-zone-title">Sidebar footer buttons</span>
+            <div class="layout-zone-items" id="zoneFooter"></div>
+          </div>
+          <div class="layout-zone" data-tab="layout" data-zone="suggestions">
+            <span class="layout-zone-title">Suggestion chips</span>
+            <div class="layout-zone-items" id="zoneSuggestions"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="setting-group" data-tab="widgets">
+        <label class="setting-label">Manage widgets</label>
+        <div id="manageWidgetsList"></div>
+        <button class="seg-btn" id="resetLayoutBtn" style="margin-top:10px;">Reset to default layout</button>
+      </div>
+</div>
   </div>
 
+  <script src="/static/layout.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

@@ -23,6 +23,7 @@ const stopBtn = document.getElementById('stopBtn');
 let conversationsCache = [];
 let searchQuery = '';
 let webSearchEnabled = false;
+let deepSearchEnabled = false;
 const webSearchBtn = $('#webSearchBtn');
 
 // ---------- Theme ----------
@@ -476,6 +477,7 @@ async function sendMessage(text) {
       temperature: parseFloat(localStorage.getItem('boing-temp') || '0.7'),
       top_p: parseFloat(localStorage.getItem('boing-topp') || '0.9'),
       web_search: webSearchEnabled,
+      deep_search: deepSearchEnabled,
     }),
       signal: abortController.signal,
     });
@@ -606,7 +608,7 @@ async function regenerateLast() {
     const r = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ conversation_id: currentConvId, message: userText, web_search: webSearchEnabled }),
+      body: JSON.stringify({ conversation_id: currentConvId, message: userText, web_search: webSearchEnabled, deep_search: deepSearchEnabled }),
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
@@ -637,10 +639,24 @@ inputEl.addEventListener('input', autoResize);
 
 webSearchBtn.addEventListener('click', () => {
   webSearchEnabled = !webSearchEnabled;
+  if (webSearchEnabled) deepSearchEnabled = false;
   webSearchBtn.style.opacity = webSearchEnabled ? '1' : '0.5';
+  deepSearchBtn.style.opacity = deepSearchEnabled ? '1' : '0.5';
   webSearchBtn.setAttribute('aria-pressed', String(webSearchEnabled));
   toast('Web search ' + (webSearchEnabled ? 'on' : 'off'));
 });
+
+const deepSearchBtn = document.getElementById('deepSearchBtn');
+if (deepSearchBtn) {
+  deepSearchBtn.addEventListener('click', () => {
+    deepSearchEnabled = !deepSearchEnabled;
+    if (deepSearchEnabled) webSearchEnabled = false;
+    deepSearchBtn.style.opacity = deepSearchEnabled ? '1' : '0.5';
+    webSearchBtn.style.opacity = webSearchEnabled ? '1' : '0.5';
+    deepSearchBtn.setAttribute('aria-pressed', String(deepSearchEnabled));
+    toast('Deep search ' + (deepSearchEnabled ? 'on' : 'off'));
+  });
+}
 
 $$('.suggestion').forEach(b => {
   b.addEventListener('click', () => sendMessage(b.dataset.text));
@@ -706,6 +722,18 @@ function applyAccent(name) {
   document.documentElement.setAttribute('data-accent', name);
   localStorage.setItem('boing-accent', name);
 }
+function applyRadius(val) {
+  const v = Number(val);
+  const r = v;
+  const lg = Math.round(v * 1.4);
+  const xl = Math.round(v * 2);
+  document.documentElement.style.setProperty('--radius', r + 'px');
+  document.documentElement.style.setProperty('--radius-lg', lg + 'px');
+  document.documentElement.style.setProperty('--radius-xl', xl + 'px');
+  localStorage.setItem('boing-radius', String(v));
+  const rv = document.getElementById('radiusValue');
+  if (rv) rv.textContent = v + 'px';
+}
 function applyThemeMode(mode) {
   localStorage.setItem('boing-theme-mode', mode);
   if (mode === 'system') {
@@ -738,6 +766,13 @@ function applyDensity(d) {
 })();
 
 // swatches
+const radiusSlider = document.getElementById('radiusSlider');
+if (radiusSlider) {
+  const saved = localStorage.getItem('boing-radius') || '10';
+  radiusSlider.value = saved;
+  applyRadius(saved);
+  radiusSlider.addEventListener('input', e => applyRadius(e.target.value));
+}
 const swatchRow = $('#accentSwatches');
 accentPresets.forEach(p => {
   const btn = document.createElement('button');
@@ -1357,3 +1392,301 @@ if (winClose) winClose.addEventListener('click', async () => {
 renderConvList();
 inputEl.focus();
 autoResize();
+
+// ---------- Drag & drop layout customization (v2) ----------
+const LAYOUT_KEY = 'boing-layout-v2';
+let layoutEditMode = false;
+let dragSrc = null;
+
+const MOVABLE_CONTAINERS = [
+  '.topbar-actions',
+  '.footer-actions',
+  '.suggestions',
+  '.mode-seg',
+  '.topbar',
+  '.sidebar-header',
+  '.sidebar-footer',
+  '.composer-inner',
+];
+
+function loadLayout() { try { return JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}'); } catch (e) { return {}; } }
+function saveLayout(l) { localStorage.setItem(LAYOUT_KEY, JSON.stringify(l)); }
+
+function containerKey(c) { return c.className.split(' ')[0] + (c.id ? '#' + c.id : ''); }
+
+function captureLayout() {
+  const l = {};
+  MOVABLE_CONTAINERS.forEach(sel => {
+    const c = document.querySelector(sel);
+    if (!c) return;
+    l[sel] = Array.from(c.children).map(child => child.getAttribute('data-layout-id') || child.id || child.textContent.trim().slice(0, 40));
+  });
+  return l;
+}
+
+function applyLayout() {
+  const l = loadLayout();
+  MOVABLE_CONTAINERS.forEach(sel => {
+    const c = document.querySelector(sel);
+    if (!c || !Array.isArray(l[sel])) return;
+    const byId = new Map(Array.from(c.children).map(el => [el.getAttribute('data-layout-id') || el.id || el.textContent.trim().slice(0, 40), el]));
+    l[sel].forEach(id => { const el = byId.get(id); if (el) c.appendChild(el); });
+  });
+}
+
+function ensureIds() {
+  document.querySelectorAll(MOVABLE_CONTAINERS.join(',')).forEach(c => {
+    Array.from(c.children).forEach(ch => {
+      if (!ch.getAttribute('data-layout-id')) {
+        ch.setAttribute('data-layout-id', ch.id || ch.textContent.trim().slice(0, 40) || Math.random().toString(36).slice(2));
+      }
+    });
+  });
+}
+
+function setDraggable(on) {
+  MOVABLE_CONTAINERS.forEach(sel => {
+    const c = document.querySelector(sel);
+    if (!c) return;
+    Array.from(c.children).forEach(ch => {
+      ch.draggable = on;
+      ch.classList.toggle('layout-draggable', on);
+    });
+  });
+}
+
+function attachHandlers() {
+  MOVABLE_CONTAINERS.forEach(sel => {
+    const c = document.querySelector(sel);
+    if (!c) return;
+    c.addEventListener('dragstart', e => {
+      if (!layoutEditMode) { e.preventDefault(); return; }
+      const t = e.target.closest('[data-layout-id]');
+      if (!t) return;
+      dragSrc = t;
+      t.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', t.getAttribute('data-layout-id'));
+    });
+    c.addEventListener('dragend', e => {
+      const t = e.target.closest('[data-layout-id]');
+      if (t) t.classList.remove('dragging');
+      dragSrc = null;
+      document.querySelectorAll('.drag-over').forEach(x => x.classList.remove('drag-over'));
+    });
+    c.addEventListener('dragover', e => {
+      if (!layoutEditMode || !dragSrc) return;
+      e.preventDefault();
+      const t = e.target.closest('[data-layout-id]');
+      if (t && t !== dragSrc) t.classList.add('drag-over');
+      e.dataTransfer.dropEffect = 'move';
+    });
+    c.addEventListener('dragleave', e => {
+      const t = e.target.closest('[data-layout-id]');
+      if (t) t.classList.remove('drag-over');
+    });
+    c.addEventListener('drop', e => {
+      if (!layoutEditMode || !dragSrc) return;
+      e.preventDefault();
+      const t = e.target.closest('[data-layout-id]');
+      const container = e.currentTarget;
+      document.querySelectorAll('.drag-over').forEach(x => x.classList.remove('drag-over'));
+      if (t && t !== dragSrc) {
+        const rect = t.getBoundingClientRect();
+        const before = e.clientY < rect.top + rect.height / 2 || e.clientX < rect.left + rect.width / 2;
+        if (before) container.insertBefore(dragSrc, t);
+        else container.insertBefore(dragSrc, t.nextSibling);
+      } else if (!t) {
+        container.appendChild(dragSrc);
+      }
+      // also allow cross-container: if dragSrc parent differs, move already done via insertBefore
+      saveLayout(captureLayout());
+    });
+  });
+}
+
+const layoutEditModeBtn = document.getElementById('layoutEditModeBtn');
+if (layoutEditModeBtn) {
+  layoutEditModeBtn.addEventListener('click', () => {
+    layoutEditMode = !layoutEditMode;
+    layoutEditModeBtn.textContent = layoutEditMode ? 'Disable edit mode' : 'Enable edit mode';
+    document.body.classList.toggle('layout-edit-mode', layoutEditMode);
+    setDraggable(layoutEditMode);
+    if (!layoutEditMode) saveLayout(captureLayout());
+    toast('Layout edit mode ' + (layoutEditMode ? 'on' : 'off'));
+  });
+}
+
+// settings modal zones (visual mirror) - keep build
+function buildZoneChips() {
+  MOVABLE_CONTAINERS.forEach(sel => {
+    // no-op placeholder; zones in settings optional
+  });
+}
+
+ensureIds();
+applyLayout();
+attachHandlers();
+setDraggable(false);
+
+// ---------- Layout store integration ----------
+(function initLayoutIntegration() {
+  if (!window.layoutStore) return;
+  const LS = window.layoutStore;
+
+  // Register default customizable elements
+  const defaults = [
+    { id: 'topbar-actions', label: 'Top bar actions', zone: 'topbar', order: 0, visible: true, movable: true, resizable: false },
+    { id: 'mode-seg', label: 'Mode segment', zone: 'topbar', order: 1, visible: true, movable: true, resizable: false },
+    { id: 'footer-actions', label: 'Sidebar footer buttons', zone: 'footer', order: 0, visible: true, movable: true, resizable: false },
+    { id: 'suggestions', label: 'Suggestion chips', zone: 'main', order: 0, visible: true, movable: true, resizable: false },
+  ];
+  defaults.forEach(d => LS.register(d));
+
+  // tag DOM items with data-layout-id
+  document.querySelectorAll(MOVABLE_CONTAINERS.join(',')).forEach(c => {
+    Array.from(c.children).forEach(ch => {
+      if (!ch.getAttribute('data-layout-id')) {
+        ch.setAttribute('data-layout-id', ch.id || ch.textContent.trim().slice(0, 40) || Math.random().toString(36).slice(2));
+      }
+    });
+  });
+
+  // Edit mode toggle
+  const editBtn = document.getElementById('editModeBtn');
+  if (editBtn) {
+    editBtn.addEventListener('click', () => {
+      const next = !LS.isEdit();
+      LS.setEditMode(next);
+      layoutEditMode = next;
+      setDraggable(next);
+      editBtn.style.opacity = next ? '1' : '0.5';
+      document.body.classList.toggle('layout-edit-mode', next);
+      toast('Edit mode ' + (next ? 'on' : 'off'));
+    });
+  }
+
+  // Manage widgets list
+  function renderManageWidgets() {
+    const el = document.getElementById('manageWidgetsList');
+    if (!el) return;
+    const st = LS.get();
+    el.innerHTML = '';
+    st.items.forEach(it => {
+      const reg = LS.getReg ? null : null;
+      const row = document.createElement('label');
+      row.style.display = 'flex';
+      row.style.alignItems = 'center';
+      row.style.gap = '8px';
+      row.style.margin = '4px 0';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = it.visible;
+      cb.addEventListener('change', () => LS.toggleVisible(it.id, cb.checked));
+      row.appendChild(cb);
+      row.appendChild(document.createTextNode(it.id));
+      el.appendChild(row);
+    });
+  }
+  LS.subscribe(renderManageWidgets);
+  renderManageWidgets();
+
+  const resetBtn = document.getElementById('resetLayoutBtn');
+  if (resetBtn) resetBtn.addEventListener('click', () => { LS.reset(); toast('Layout reset'); });
+
+  // Apply visibility
+  function applyVisibility() {
+    const st = LS.get();
+    st.items.forEach(it => {
+      // find element by data-layout-id == id (best effort)
+      const el = document.querySelector(`[data-layout-id="${CSS.escape(it.id)}"]`);
+      if (el) el.style.display = it.visible ? '' : 'none';
+    });
+  }
+  LS.subscribe(applyVisibility);
+  applyVisibility();
+
+  // ARIA live region already created by store
+})();
+
+// ---------- Add / remove widgets ----------
+const WIDGET_CATALOG = {
+  button: { label: 'Button', render: () => { const b = document.createElement('button'); b.className='icon-btn'; b.textContent='New button'; return b; } },
+  input: { label: 'Input', render: () => { const i = document.createElement('input'); i.className='search-input'; i.placeholder='New input'; i.style.width='120px'; return i; } },
+  bar: { label: 'Divider bar', render: () => { const d = document.createElement('div'); d.style.width='2px'; d.style.height='20px'; d.style.background='var(--border-strong)'; return d; } },
+  spacer: { label: 'Spacer', render: () => { const s = document.createElement('span'); s.style.display='inline-block'; s.style.width='20px'; return s; } },
+};
+
+function addWidget(type, zoneSelector) {
+  const cat = WIDGET_CATALOG[type];
+  if (!cat) return;
+  const container = document.querySelector(zoneSelector);
+  if (!container) return;
+  const id = 'widget-' + type + '-' + Date.now();
+  const el = cat.render();
+  el.setAttribute('data-layout-id', id);
+  el.setAttribute('data-widget-type', type);
+  // remove button in edit mode
+  const rm = document.createElement('button');
+  rm.textContent = '×';
+  rm.className = 'widget-remove';
+  rm.style.cssText = 'margin-left:4px;cursor:pointer;border:none;background:transparent;color:var(--accent);font-weight:bold;';
+  rm.addEventListener('click', (e) => { e.stopPropagation(); removeWidget(id); });
+  const wrap = document.createElement('span');
+  wrap.style.display = 'inline-flex';
+  wrap.style.alignItems = 'center';
+  wrap.appendChild(el);
+  wrap.setAttribute('data-layout-id', id);
+  wrap.appendChild(rm);
+  rm.style.display = 'none';
+  container.appendChild(wrap);
+
+  if (window.layoutStore) {
+    window.layoutStore.register({ id, label: cat.label + ' ' + id.slice(-4), zone: zoneSelector, order: container.children.length - 1, visible: true, movable: true, resizable: false });
+  }
+  // show remove buttons if edit mode
+  syncWidgetRemoveButtons();
+  toast('Added ' + cat.label);
+}
+
+function removeWidget(id) {
+  const el = document.querySelector(`[data-layout-id="${CSS.escape(id)}"]`);
+  if (el) el.remove();
+  if (window.layoutStore) {
+    const st = window.layoutStore.get();
+    st.items = st.items.filter(it => it.id !== id);
+    window.layoutStore.reset; // no-op reference
+  }
+  try { localStorage.setItem('boing-layout', JSON.stringify(window.layoutStore.get())); } catch(e){}
+  toast('Removed widget');
+}
+
+function syncWidgetRemoveButtons() {
+  const edit = window.layoutStore ? window.layoutStore.isEdit() : false;
+  document.querySelectorAll('.widget-remove').forEach(b => { b.style.display = edit ? '' : 'none'; });
+}
+
+// Add "Add widget" controls to manage widgets panel
+(function setupAddWidgetUI() {
+  const panel = document.getElementById('manageWidgetsList');
+  if (!panel) return;
+  const wrap = document.createElement('div');
+  wrap.style.marginTop = '10px';
+  const sel = document.createElement('select');
+  sel.id = 'addWidgetType';
+  Object.keys(WIDGET_CATALOG).forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = WIDGET_CATALOG[k].label; sel.appendChild(o); });
+  const zoneSel = document.createElement('select');
+  zoneSel.id = 'addWidgetZone';
+  MOVABLE_CONTAINERS.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; zoneSel.appendChild(o); });
+  const btn = document.createElement('button');
+  btn.className = 'seg-btn';
+  btn.textContent = 'Add widget';
+  btn.style.marginLeft = '6px';
+  btn.addEventListener('click', () => addWidget(sel.value, zoneSel.value));
+  wrap.appendChild(sel);
+  wrap.appendChild(zoneSel);
+  wrap.appendChild(btn);
+  panel.parentNode.insertBefore(wrap, panel.nextSibling);
+
+  if (window.layoutStore) window.layoutStore.subscribe(syncWidgetRemoveButtons);
+})();

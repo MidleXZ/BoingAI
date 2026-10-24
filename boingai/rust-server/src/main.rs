@@ -57,6 +57,8 @@ struct ChatRequest {
     top_p: Option<f32>,
     #[serde(default)]
     web_search: bool,
+    #[serde(default)]
+    deep_search: bool,
 }
 
 // ----- Web search (DuckDuckGo HTML, no API key required) -----
@@ -189,6 +191,103 @@ async fn duckduckgo_search(
     };
 
     parse_ddg_results(&html, limit)
+}
+
+async fn fetch_page_text(client: &reqwest::Client, url: &str, max_chars: usize) -> String {
+    let resp = match client
+        .get(url)
+        .header(
+            reqwest::header::USER_AGENT,
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+        )
+        .timeout(std::time::Duration::from_secs(15))
+        .send()
+        .await
+    {
+        Ok(r) => r,
+        Err(_) => return String::new(),
+    };
+    let html = match resp.text().await {
+        Ok(h) => h,
+        Err(_) => return String::new(),
+    };
+
+    // Strip HTML tags.
+    let mut out = String::new();
+    let mut in_tag = false;
+    for c in html.chars() {
+        if c == '<' {
+            in_tag = true;
+            continue;
+        }
+        if c == '>' {
+            in_tag = false;
+            continue;
+        }
+        if !in_tag {
+            out.push(c);
+        }
+    }
+
+    // Collapse whitespace.
+    let mut cleaned = String::new();
+    let mut prev_ws = false;
+    for c in out.chars() {
+        if c.is_whitespace() {
+            if !prev_ws {
+                cleaned.push(' ');
+            }
+            prev_ws = true;
+        } else {
+            cleaned.push(c);
+            prev_ws = false;
+        }
+    }
+    let cleaned = cleaned.trim().to_string();
+    if cleaned.len() > max_chars {
+        format!("{}...", &cleaned[..max_chars])
+    } else {
+        cleaned
+    }
+}
+
+async fn deep_search_context(client: &reqwest::Client, query: &str) -> String {
+    let results = duckduckgo_search(client, query, 8).await;
+    if results.is_empty() {
+        return String::new();
+    }
+
+    let mut ctx = String::from("\n\nDeep web research (search + full page reads):\n");
+    // Fetch full content for the top 3 results in parallel.
+    let mut futs = Vec::new();
+    for r in results.iter().take(3) {
+        futs.push(fetch_page_text(client, &r.url, 2500));
+    }
+    let pages = futures::future::join_all(futs).await;
+
+    for (i, (r, page)) in results.iter().take(3).zip(pages.iter()).enumerate() {
+        ctx.push_str(&format!(
+            "[{}] Title: {}\nURL: {}\nSnippet: {}\nPage excerpt: {}\n\n",
+            i + 1,
+            r.title,
+            r.url,
+            r.snippet,
+            if page.is_empty() { "(no content)" } else { page }
+        ));
+    }
+
+    if results.len() > 3 {
+        ctx.push_str("Additional search hits:\n");
+        for r in results.iter().skip(3) {
+            ctx.push_str(&format!("- {} ({})\n", r.title, r.url));
+        }
+        ctx.push_str("\n");
+    }
+
+    ctx.push_str(
+        "Use the above deep research to answer thoroughly and accurately. Cite sources by URL when helpful.\n",
+    );
+    ctx
 }
 
 async fn web_search(State(s): State<Arc<AppState>>, Json(req): Json<SearchRequest>) -> Response {
@@ -324,14 +423,16 @@ async fn chat(State(s): State<Arc<AppState>>, Json(req): Json<ChatRequest>) -> R
     let user_text = cpp_sanitize(&req.message);
     let tokens_in = cpp_tokens(&user_text);
 
-    // Optional web search: prepend results to the system prompt
-    let sys = if req.web_search {
+    // Optional web search / deep research: prepend results to the system prompt
+    let base = req.system_prompt.clone().unwrap_or_else(|| "You are BoingAI, a helpful, concise and friendly assistant. Keep answers clear and minimal.".to_string());
+    let sys = if req.deep_search {
+        base + &deep_search_context(&s.http, &user_text).await
+    } else if req.web_search {
         let limit = 5usize;
         let results = duckduckgo_search(&s.http, &user_text, limit).await;
-        let base = req.system_prompt.clone().unwrap_or_else(|| "You are BoingAI, a helpful, concise and friendly assistant. Keep answers clear and minimal.".to_string());
         base + &search_context(&results)
     } else {
-        req.system_prompt.clone().unwrap_or_else(|| "You are BoingAI, a helpful, concise and friendly assistant. Keep answers clear and minimal.".to_string())
+        base
     };
 
     // Resolve conversation id
@@ -418,14 +519,16 @@ async fn chat_stream(
     let user_text = cpp_sanitize(&req.message);
     let tokens_in = cpp_tokens(&user_text);
 
-    // Optional web search: prepend results to the system prompt
-    let sys = if req.web_search {
+    // Optional web search / deep research: prepend results to the system prompt
+    let base = req.system_prompt.clone().unwrap_or_else(|| "You are BoingAI, a helpful, concise and friendly assistant. Keep answers clear and minimal.".to_string());
+    let sys = if req.deep_search {
+        base + &deep_search_context(&s.http, &user_text).await
+    } else if req.web_search {
         let limit = 5usize;
         let results = duckduckgo_search(&s.http, &user_text, limit).await;
-        let base = req.system_prompt.clone().unwrap_or_else(|| "You are BoingAI, a helpful, concise and friendly assistant. Keep answers clear and minimal.".to_string());
         base + &search_context(&results)
     } else {
-        req.system_prompt.clone().unwrap_or_else(|| "You are BoingAI, a helpful, concise and friendly assistant. Keep answers clear and minimal.".to_string())
+        base
     };
 
     // Resolve conversation id
