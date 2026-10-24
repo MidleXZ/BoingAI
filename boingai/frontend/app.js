@@ -1939,3 +1939,27 @@ if (settingsBtn2) settingsBtn2.addEventListener('click', () => setTimeout(loadMe
 
 // slash command /remember
 const _origSlash = window.handleSlash;
+
+// ---------- Name prompt ----------
+(function initNamePrompt() {
+  const backdrop = document.getElementById('nameBackdrop');
+  const modal = document.getElementById('nameModal');
+  const input = document.getElementById('nameInput');
+  const btn = document.getElementById('nameSaveBtn');
+  if (!backdrop || !modal) return;
+  function show() { backdrop.classList.add('show'); modal.classList.add('show'); }
+  function hide() { backdrop.classList.remove('show'); modal.classList.remove('show'); }
+  if (!localStorage.getItem('boing-username')) {
+    setTimeout(show, 600);
+  }
+  if (btn) btn.addEventListener('click', () => {
+    const v = (input.value || '').trim();
+    if (v) localStorage.setItem('boing-username', v);
+    hide();
+    toast('Hi ' + (v || 'there') + '!');
+    // update empty state greeting
+    const h2 = document.querySelector('.empty-state h2');
+    if (h2 && v) h2.textContent = `How can I help you today, ${v}?`;
+  });
+  if (input) input.addEventListener('keydown', (e) => { if (e.key === 'Enter') btn.click(); });
+})();

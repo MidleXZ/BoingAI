@@ -329,5 +329,17 @@
 
   <script src="/static/layout.js"></script>
   <script src="/static/app.js"></script>
+
+  <!-- Name prompt modal -->
+  <div class="modal-backdrop" id="nameBackdrop"></div>
+  <div class="modal" id="nameModal" role="dialog" aria-label="Your name">
+    <div class="modal-header"><h3>Welcome to BoingAI</h3></div>
+    <div class="modal-body">
+      <label class="setting-label">What should BoingAI Call you?</label>
+      <input type="text" id="nameInput" placeholder="Your name" style="width:100%;margin-top:8px;" />
+      <button class="seg-btn" id="nameSaveBtn" style="margin-top:12px;">Save</button>
+    </div>
+  </div>
+
 </body>
 </html>
