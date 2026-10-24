@@ -287,7 +287,7 @@ function newChat() {
 }
 
 // ---------- Messages ----------
-function appendMessage(role, content, animate = true) {
+function appendMessage(role, content, animate = true, images = []) {
   if (emptyStateEl.parentNode === messagesEl) emptyStateEl.style.display = 'none';
   const msg = document.createElement('div');
   msg.className = `msg ${role}`;
@@ -320,6 +320,18 @@ function appendMessage(role, content, animate = true) {
     bubble.textContent = content;
   }
   wrap.appendChild(bubble);
+
+  if (images && images.length) {
+    const imgWrap = document.createElement('div');
+    imgWrap.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;';
+    images.forEach(b64 => {
+      const img = document.createElement('img');
+      img.src = 'data:image/png;base64,' + b64;
+      img.style.cssText = 'max-width:200px;max-height:200px;border-radius:8px;';
+      imgWrap.appendChild(img);
+    });
+    wrap.appendChild(imgWrap);
+  }
 
   const meta = document.createElement('div');
   meta.className = 'msg-meta';
@@ -444,7 +456,10 @@ async function sendMessage(text) {
   stopBtn.style.display = 'grid';
   inputEl.disabled = true;
 
-  appendMessage('user', text);
+  const imgs = pendingImages.slice();
+  pendingImages = [];
+  renderImagePreviews();
+  appendMessage('user', text, true, imgs);
   inputEl.value = '';
   autoResize();
 
