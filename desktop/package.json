@@ -51,7 +51,7 @@
       "target": [
         "nsis"
       ],
-      "icon": "../other/logo.png",
+      "icon": "build/icon.ico",
       "artifactName": "BoingAI-Setup-${version}.${ext}"
     },
     "nsis": {
@@ -61,9 +61,9 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "BoingAI",
-      "installerIcon": "../other/logo.png",
-      "uninstallerIcon": "../other/logo.png",
-      "installerHeaderIcon": "../other/logo.png",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
       "license": "LICENSE.electron.txt",
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false,
