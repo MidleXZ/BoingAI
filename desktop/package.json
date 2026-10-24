@@ -65,8 +65,6 @@
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico",
       "license": "LICENSE.electron.txt",
-      "welcomePage": true,
-      "finishPage": true,
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false,
       "displayLanguageSelector": true,
