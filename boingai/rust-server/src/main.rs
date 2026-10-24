@@ -390,6 +390,28 @@ async fn delete_memory(State(s): State<Arc<AppState>>, Path(id): Path<String>) -
     }
 }
 
+async fn get_profile(State(s): State<Arc<AppState>>) -> Response {
+    let url = format!("{}/profile", s.csharp_url);
+    match s.http.get(&url).send().await {
+        Ok(r) => {
+            let body: serde_json::Value = r.json().await.unwrap_or(serde_json::json!({"username": ""}));
+            Json(body).into_response()
+        }
+        Err(e) => (StatusCode::BAD_GATEWAY, format!("profile: {e}")).into_response(),
+    }
+}
+
+async fn update_profile(State(s): State<Arc<AppState>>, Json(body): Json<serde_json::Value>) -> Response {
+    let url = format!("{}/profile", s.csharp_url);
+    match s.http.put(&url).json(&body).send().await {
+        Ok(r) => {
+            let v: serde_json::Value = r.json().await.unwrap_or(serde_json::json!({}));
+            Json(v).into_response()
+        }
+        Err(e) => (StatusCode::BAD_GATEWAY, format!("profile: {e}")).into_response(),
+    }
+}
+
 async fn health(State(s): State<Arc<AppState>>) -> impl IntoResponse {
     let v = unsafe {
         CStr::from_ptr(boing_version()).to_string_lossy().into_owned()
@@ -746,6 +768,7 @@ async fn main() {
         .route("/api/search", post(web_search))
         .route("/api/memories", get(list_memories).post(add_memory))
         .route("/api/memories/:id", delete(delete_memory))
+        .route("/api/profile", get(get_profile).put(update_profile))
         .route("/api/window/minimize", post(window_minimize))
         .route("/api/window/close", post(window_close))
         .nest_service("/static", ServeDir::new(&frontend_dir))

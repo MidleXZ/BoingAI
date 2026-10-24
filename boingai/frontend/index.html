@@ -5,18 +5,44 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BoingAI</title>
   <link rel="stylesheet" href="/static/styles.css" />
-  <script>
-    function openSettings(){var b=document.getElementById('settingsBackdrop');var m=document.getElementById('settingsModal');if(b)b.classList.add('show');if(m)m.classList.add('show');}
-    function closeSettings(){var b=document.getElementById('settingsBackdrop');var m=document.getElementById('settingsModal');if(b)b.classList.remove('show');if(m)m.classList.remove('show');}
-  </script>
   <link rel="icon" href="/static/logo.png" type="image/png" />
+  <script>
+    function openSettings(){ 
+      var b=document.getElementById('settingsBackdrop'); 
+      var m=document.getElementById('settingsModal'); 
+      if(b) b.classList.add('show'); 
+      if(m) m.classList.add('show'); 
+      var tabs=document.querySelectorAll('.settings-tab');
+      tabs.forEach(function(x){x.classList.toggle('active',x.dataset.tab==='appearance');});
+      var groups=document.querySelectorAll('.setting-group');
+      groups.forEach(function(g){g.style.display=(g.dataset.tab==='appearance')?'flex':'none';});
+    }
+    function closeSettings(){ var b=document.getElementById('settingsBackdrop'); var m=document.getElementById('settingsModal'); if(b)b.classList.remove('show'); if(m)m.classList.remove('show'); }
+    function switchSettingsTab(t){ 
+      document.querySelectorAll('.settings-tab').forEach(function(x){x.classList.toggle('active',x.dataset.tab===t);}); 
+      document.querySelectorAll('.setting-group').forEach(function(g){g.style.display=(g.dataset.tab===t)?'flex':'none';}); 
+    }
+    document.addEventListener('DOMContentLoaded', function(){
+      var sb=document.getElementById('settingsBtn');
+      if(sb){ sb.onclick=function(e){e.preventDefault();openSettings();}; }
+      var sc=document.getElementById('settingsClose');
+      if(sc){ sc.onclick=closeSettings; }
+      var sb2=document.getElementById('settingsBackdrop');
+      if(sb2){ sb2.onclick=closeSettings; }
+    });
+  </script>
 </head>
 <body>
   <div class="app">
-    <!-- Sidebar backdrop (mobile) -->
+    <div class="bg-anim" aria-hidden="true">
+      <span class="bg-stars"></span>
+      <span class="bg-glow"></span>
+      <span class="orb orb-1"></span>
+      <span class="orb orb-2"></span>
+      <span class="orb orb-3"></span>
+      <span class="orb orb-4"></span>
+    </div>
     <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
-
-    <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <div class="brand">
@@ -24,32 +50,19 @@
           <span class="brand-name">BoingAI</span>
         </div>
         <button class="icon-btn" id="sidebarToggle" aria-label="Toggle sidebar">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="9" y1="3" x2="9" y2="21"></line>
-          </svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
         </button>
       </div>
-
       <button class="new-chat-btn" id="newChatBtn">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <line x1="12" y1="5" x2="12" y2="19"></line>
-          <line x1="5" y1="12" x2="19" y2="12"></line>
-        </svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
         <span>New Chat</span>
         <kbd class="kbd">⌘K</kbd>
       </button>
-
       <div class="search-wrap">
-        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
         <input type="text" id="searchInput" class="search-input" placeholder="Search conversations..." autocomplete="off" />
       </div>
-
       <div class="conv-list" id="convList"></div>
-
       <div class="sidebar-footer">
         <div class="model-pill">
           <span class="dot"></span>
@@ -58,83 +71,36 @@
           <span class="pill-status">Local</span>
         </div>
         <div class="footer-actions">
-          <button class="footer-btn" id="bookmarksBtn">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"></path>
-            </svg>
-            Bookmarks
-          </button>
-          <button class="footer-btn" id="clearAllBtn">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
-            Clear
-          </button>
+          <button class="footer-btn" id="bookmarksBtn">🔖 Bookmarks</button>
+          <button class="footer-btn" id="clearAllBtn">🗑 Clear all</button>
         </div>
       </div>
     </aside>
 
-    <!-- Main -->
     <main class="main">
       <header class="topbar">
         <button class="icon-btn" id="menuBtn" aria-label="Toggle sidebar">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <line x1="3" y1="18" x2="21" y2="18"></line>
-          </svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
         </button>
         <h1 class="chat-title" id="chatTitle">New conversation</h1>
-        
         <div class="mode-seg" id="modeSeg">
           <button class="mode-btn" data-mode="normal">Normal</button>
           <button class="mode-btn" data-mode="coding">Coding</button>
           <button class="mode-btn" data-mode="thinking">Thinking</button>
         </div>
-        
         <div class="topbar-actions">
-          <button class="icon-btn" id="settingsBtn" title="Settings" aria-label="Settings" onclick="openSettings()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-            </svg>
+          <button class="icon-btn" id="settingsBtn" title="Settings" aria-label="Settings" onclick="openSettings()" type="button">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
           </button>
           <button class="icon-btn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">
-            <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="5"></circle>
-              <line x1="12" y1="1" x2="12" y2="3"></line>
-              <line x1="12" y1="21" x2="12" y2="23"></line>
-              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-              <line x1="1" y1="12" x2="3" y2="12"></line>
-              <line x1="21" y1="12" x2="23" y2="12"></line>
-              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-            </svg>
-            <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-            </svg>
+            <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+            <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
           </button>
         </div>
-        
         <div class="window-controls" id="windowControls">
-          <button class="win-btn" id="winMin" title="Minimize">
-            <svg width="12" height="12" viewBox="0 0 12 12">
-              <line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1"/>
-            </svg>
-          </button>
-          <button class="win-btn" id="winMax" title="Maximize">
-            <svg width="12" height="12" viewBox="0 0 12 12">
-              <rect x="2" y="2" width="8" height="8" stroke="currentColor" stroke-width="1" fill="none"/>
-            </svg>
-          </button>
-          <button class="win-btn win-close" id="winClose" title="Close">
-            <svg width="12" height="12" viewBox="0 0 12 12">
-              <line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" stroke-width="1"/>
-              <line x1="10" y1="2" x2="2" y2="10" stroke="currentColor" stroke-width="1"/>
-            </svg>
-          </button>
+          <button class="win-btn" id="winMin" title="Minimize"><svg width="12" height="12" viewBox="0 0 12 12"><line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1"/></svg></button>
+          <button class="win-btn" id="winMax" title="Maximize"><svg width="12" height="12" viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" stroke="currentColor" stroke-width="1" fill="none"/></svg></button>
+          <button class="win-btn win-close" id="winClose" title="Close"><svg width="12" height="12" viewBox="0 0 12 12"><line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" stroke-width="1"/><line x1="10" y1="2" x2="2" y2="10" stroke="currentColor" stroke-width="1"/></svg></button>
         </div>
       </header>
 
@@ -143,77 +109,23 @@
           <img class="empty-logo" src="/static/logo.png" alt="BoingAI" />
           <h2>How can I help you today?</h2>
           <p>Ask anything. Powered by MiniCPM-V 4.6 — running locally, privately.</p>
-          <div class="suggestions">
-            <button class="suggestion" data-text="Explain quantum computing in simple terms.">
-              <span class="sug-icon">⚛️</span>
-              <span class="sug-text">Explain quantum computing simply</span>
-            </button>
-            <button class="suggestion" data-text="Write a short poem about spring.">
-              <span class="sug-icon">🌸</span>
-              <span class="sug-text">Write a poem about spring</span>
-            </button>
-            <button class="suggestion" data-text="Give me 5 productivity tips.">
-              <span class="sug-icon">⚡</span>
-              <span class="sug-text">5 productivity tips</span>
-            </button>
-            <button class="suggestion" data-text="How do I learn Rust programming?">
-              <span class="sug-icon">🦀</span>
-              <span class="sug-text">How do I learn Rust?</span>
-            </button>
-            <button class="suggestion" data-text="Help me debug this code.">
-              <span class="sug-icon">🐛</span>
-              <span class="sug-text">Debug code</span>
-            </button>
-            <button class="suggestion" data-text="What are the best practices for API design?">
-              <span class="sug-icon">🔌</span>
-              <span class="sug-text">API design best practices</span>
-            </button>
-          </div>
+          <div class="suggestions"></div>
         </div>
       </section>
 
       <button class="scroll-bottom-btn" id="scrollBottomBtn" aria-label="Scroll to bottom">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="6 9 12 15 18 9"></polyline>
-        </svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
       </button>
 
       <footer class="composer">
         <div class="composer-inner">
           <textarea id="input" rows="1" placeholder="Message BoingAI..." autocomplete="off" spellcheck="true"></textarea>
-          <button class="icon-btn" id="micBtn" title="Voice input">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-              <line x1="12" y1="19" x2="12" y2="23"></line>
-              <line x1="8" y1="23" x2="16" y2="23"></line>
-            </svg>
-          </button>
-          <button class="icon-btn web-search-btn" id="webSearchBtn" title="Web search">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-          </button>
-          <button class="send-btn" id="sendBtn" aria-label="Send">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="22" y1="2" x2="11" y2="13"></line>
-              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-            </svg>
-          </button>
-          <button class="send-btn stop-btn" id="stopBtn" aria-label="Stop" style="display:none;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <rect x="6" y="6" width="12" height="12" rx="2"></rect>
-            </svg>
-          </button>
+          <button class="icon-btn" id="micBtn" title="Voice input"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg></button>
+          <button class="icon-btn web-search-btn" id="webSearchBtn" title="Web search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></button>
+          <button class="send-btn" id="sendBtn" aria-label="Send"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg></button>
+          <button class="send-btn stop-btn" id="stopBtn" aria-label="Stop" style="display:none;"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg></button>
         </div>
-        <div class="composer-hint">
-          <span>Enter to send</span>
-          <span class="hint-sep">•</span>
-          <span>Shift+Enter for new line</span>
-          <span class="hint-sep">•</span>
-          <span>⌘K new chat</span>
-        </div>
+        <div class="composer-hint"><span>Enter to send</span><span class="hint-sep">•</span><span>Shift+Enter for new line</span><span class="hint-sep">•</span><span>⌘K new chat</span></div>
       </footer>
     </main>
   </div>
@@ -223,90 +135,133 @@
   <!-- Bookmarks modal -->
   <div class="modal-backdrop" id="bookmarksBackdrop"></div>
   <div class="modal" id="bookmarksModal" role="dialog">
-    <div class="modal-header">
-      <h3>Bookmarks</h3>
-      <button class="icon-btn" id="bookmarksClose">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      </button>
-    </div>
+    <div class="modal-header"><h3>Bookmarks</h3><button class="icon-btn" id="bookmarksClose"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></div>
     <div class="modal-body" id="bookmarksList"></div>
   </div>
 
-  <!-- Settings modal -->
-  <div class="modal-backdrop" id="settingsBackdrop"></div>
-  <div class="modal" id="settingsModal" role="dialog">
+  <!-- Keyboard shortcuts modal -->
+  <div class="modal-backdrop" id="shortcutsBackdrop"></div>
+  <div class="modal" id="shortcutsModal" role="dialog" aria-label="Keyboard shortcuts">
     <div class="modal-header">
-      <h3>Settings</h3>
-      <button class="icon-btn" id="settingsClose">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
+      <h3>Keyboard shortcuts</h3>
+      <button class="icon-btn" id="shortcutsClose">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
       </button>
     </div>
     <div class="modal-body">
+      <div class="shortcut-row"><kbd>⌘/Ctrl + K</kbd><span>New chat</span></div>
+      <div class="shortcut-row"><kbd>/</kbd><span>Focus input</span></div>
+      <div class="shortcut-row"><kbd>Enter</kbd><span>Send message</span></div>
+      <div class="shortcut-row"><kbd>Shift + Enter</kbd><span>New line</span></div>
+      <div class="shortcut-row"><kbd>Esc</kbd><span>Stop generation / close modal</span></div>
+      <div class="shortcut-row"><kbd>?</kbd><span>Show shortcuts</span></div>
+    </div>
+  </div>
+
+  <!-- Settings modal -->
+  <div class="modal-backdrop" id="settingsBackdrop" onclick="closeSettings()"></div>
+  <div class="modal" id="settingsModal" role="dialog" aria-label="Settings">
+    <div class="modal-header"><h3>Settings</h3><button class="icon-btn" id="settingsClose" onclick="closeSettings()" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></div>
+    <div class="modal-body">
       <div class="settings-tabs">
-        <button class="settings-tab active" data-tab="appearance">Appearance</button>
-        <button class="settings-tab" data-tab="behavior">Behavior</button>
-        <button class="settings-tab" data-tab="advanced">Advanced</button>
+        <button class="settings-tab active" data-tab="appearance" onclick="switchSettingsTab('appearance')">Appearance</button>
+        <button class="settings-tab" data-tab="behavior" onclick="switchSettingsTab('behavior')">Behavior</button>
+        <button class="settings-tab" data-tab="advanced" onclick="switchSettingsTab('advanced')">Advanced</button>
+        <button class="settings-tab" data-tab="layout" onclick="switchSettingsTab('layout')">Layout</button>
+        <button class="settings-tab" data-tab="widgets" onclick="switchSettingsTab('widgets')">Widgets</button>
+        <button class="settings-tab" data-tab="memory" onclick="switchSettingsTab('memory')">Memory</button>
       </div>
 
-      <div class="setting-group" data-tab="appearance">
+      <div class="setting-group" data-tab="appearance" style="display:flex;">
         <label class="setting-label">Theme</label>
         <div class="seg-row" id="themeSeg">
           <button class="seg-btn" data-val="light">Light</button>
           <button class="seg-btn" data-val="dark">Dark</button>
           <button class="seg-btn" data-val="system">System</button>
         </div>
-      </div>
-
-      <div class="setting-group" data-tab="appearance">
-        <label class="setting-label">Accent Color</label>
+        <label class="setting-label">Accent color</label>
         <div class="swatch-row" id="accentSwatches"></div>
-      </div>
-
-      <div class="setting-group" data-tab="appearance">
-        <label class="setting-label">Font Size</label>
+        <label class="setting-label">Font size</label>
         <div class="seg-row" id="fontSeg">
           <button class="seg-btn" data-val="small">Small</button>
           <button class="seg-btn" data-val="medium">Medium</button>
           <button class="seg-btn" data-val="large">Large</button>
         </div>
-      </div>
-
-      <div class="setting-group" data-tab="behavior">
-        <label class="setting-label">Preferences</label>
-        <div class="toggle-row">
-          <span>Show timestamps</span>
-          <input type="checkbox" id="togTimestamps" class="toggle">
-        </div>
-        <div class="toggle-row">
-          <span>Auto-scroll</span>
-          <input type="checkbox" id="togAutoScroll" class="toggle">
-        </div>
-        <div class="toggle-row">
-          <span>Sound on complete</span>
-          <input type="checkbox" id="togSound" class="toggle">
+        <label class="setting-label">Corner radius</label>
+        <input type="range" id="radiusSlider" min="0" max="24" value="10" />
+        <span id="radiusValue">10px</span>
+        <label class="setting-label">Font family</label>
+        <div class="seg-row" id="fontFamilySeg">
+          <button class="seg-btn" data-val="sans">Sans</button>
+          <button class="seg-btn" data-val="mono">Mono</button>
+          <button class="seg-btn" data-val="fira">Fira</button>
         </div>
       </div>
 
-      <div class="setting-group" data-tab="advanced">
+      <div class="setting-group" data-tab="behavior" style="display:none;">
+        <div class="toggle-row"><span>Show timestamps</span><input type="checkbox" id="togTimestamps" class="toggle"></div>
+        <div class="toggle-row"><span>Auto-scroll</span><input type="checkbox" id="togAutoScroll" class="toggle"></div>
+        <div class="toggle-row"><span>Sound on complete</span><input type="checkbox" id="togSound" class="toggle"></div>
+        <div class="toggle-row"><span>Word wrap</span><input type="checkbox" id="togWordWrap" class="toggle"></div>
+        <div class="toggle-row"><span>Compact mode</span><input type="checkbox" id="togCompact" class="toggle"></div>
+        <div class="toggle-row"><span>Notifications</span><input type="checkbox" id="togNotify" class="toggle"></div>
+        <div class="toggle-row"><span>Token counts</span><input type="checkbox" id="togTokens" class="toggle"></div>
+        <div class="toggle-row"><span>Line numbers</span><input type="checkbox" id="togLineNums" class="toggle"></div>
         <label class="setting-label">Temperature <span id="tempVal">0.7</span></label>
-        <input type="range" id="tempSlider" min="0" max="2" step="0.1" value="0.7" style="width:100%;">
+        <input type="range" id="tempSlider" min="0" max="2" step="0.1" value="0.7" />
+        <label class="setting-label">Top-p <span id="toppVal">0.9</span></label>
+        <input type="range" id="toppSlider" min="0" max="1" step="0.05" value="0.9" />
+        <label class="setting-label">System prompt</label>
+        <textarea id="systemPromptInput" rows="3"></textarea>
+        <button class="seg-btn" id="saveSystemPrompt" style="align-self:flex-start;">Save</button>
       </div>
 
-      <div class="setting-group" data-tab="advanced">
-        <label class="setting-label">Top P <span id="toppVal">0.9</span></label>
-        <input type="range" id="toppSlider" min="0" max="1" step="0.05" value="0.9" style="width:100%;">
+      <div class="setting-group" data-tab="advanced" style="display:none;">
+        <div class="toggle-row"><span>Web search</span><input type="checkbox" id="togWebSearch" class="toggle"></div>
+        <div class="toggle-row"><span>Deep search</span><input type="checkbox" id="togDeepSearch" class="toggle"></div>
       </div>
 
-      <div class="setting-group" data-tab="advanced">
-        <label class="setting-label">System Prompt</label>
-        <textarea id="systemPromptInput" class="settings-textarea" rows="4" placeholder="You are a helpful AI assistant..." style="width:100%; padding:12px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); color:var(--text-primary); font-family:var(--font-sans); font-size:13px; resize:vertical;"></textarea>
-        <button class="seg-btn" id="saveSystemPrompt" style="align-self:flex-start;">Save Prompt</button>
+      <div class="setting-group" data-tab="layout" style="display:none;">
+        <label class="setting-label">Drag &amp; drop layout</label>
+        <p class="setting-hint">Toggle edit mode, then drag items to reorder them. Changes are saved automatically.</p>
+        <button class="seg-btn" id="layoutEditModeBtn">Enable edit mode</button>
+        <div class="layout-zones" id="layoutZones">
+          <div class="layout-zone" data-zone="topbar-actions"><span class="layout-zone-title">Top bar actions</span><div class="layout-zone-items" id="zoneTopbar"></div></div>
+          <div class="layout-zone" data-zone="footer-actions"><span class="layout-zone-title">Sidebar footer buttons</span><div class="layout-zone-items" id="zoneFooter"></div></div>
+          <div class="layout-zone" data-zone="suggestions"><span class="layout-zone-title">Suggestion chips</span><div class="layout-zone-items" id="zoneSuggestions"></div></div>
+        </div>
+      </div>
+
+      <div class="setting-group" data-tab="widgets" style="display:none;">
+        <label class="setting-label">Manage widgets</label>
+        <div id="manageWidgetsList"></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;">
+          <select id="addWidgetType">
+            <option value="button">Button</option>
+            <option value="input">Input</option>
+            <option value="bar">Divider bar</option>
+            <option value="spacer">Spacer</option>
+          </select>
+          <select id="addWidgetZone">
+            <option value=".topbar-actions">.topbar-actions</option>
+            <option value=".footer-actions">.footer-actions</option>
+            <option value=".suggestions">.suggestions</option>
+            <option value=".composer-inner">.composer-inner</option>
+          </select>
+          <button class="seg-btn" id="addWidgetBtn">Add widget</button>
+        </div>
+        <button class="seg-btn" id="resetLayoutBtn" style="margin-top:10px;">Reset to default layout</button>
+      </div>
+
+      <div class="setting-group" data-tab="memory" style="display:none;">
+        <label class="setting-label">Memory</label>
+        <p class="setting-hint">Facts the AI remembers across conversations.</p>
+        <div style="display:flex;gap:6px;margin-bottom:8px;">
+          <input id="memKey" placeholder="Key (e.g. name)" style="flex:1;" />
+          <input id="memVal" placeholder="Value" style="flex:2;" />
+          <button class="seg-btn" id="memAddBtn">Add</button>
+        </div>
+        <div id="memList"></div>
       </div>
     </div>
   </div>
@@ -316,15 +271,36 @@
   <div class="modal" id="nameModal" role="dialog">
     <div class="modal-header">
       <h3>Welcome to BoingAI</h3>
+      <button class="icon-btn" id="nameCloseBtn" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
     </div>
     <div class="modal-body">
-      <label class="setting-label">What should BoingAI call you?</label>
-      <input type="text" id="nameInput" placeholder="Your name" style="width:100%; padding:12px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); color:var(--text-primary); font-family:var(--font-sans); font-size:14px;">
-      <button class="seg-btn" id="nameSaveBtn" style="margin-top:12px;">Get Started</button>
+      <label class="setting-label" for="nameInput">What should we call you?</label>
+      <input type="text" id="nameInput" placeholder="Enter your name" autocomplete="name" />
+      <button class="seg-btn" id="nameSaveBtn">Save</button>
     </div>
   </div>
 
   <script src="/static/layout.js"></script>
   <script src="/static/app.js"></script>
+
+<script>
+window.addEventListener('load', function(){
+  var b=document.getElementById('settingsBtn');
+  if(b){ b.onclick=function(e){e.preventDefault(); var bb=document.getElementById('settingsBackdrop'); var mm=document.getElementById('settingsModal'); if(bb)bb.classList.add('show'); if(mm)mm.classList.add('show'); var tabs=document.querySelectorAll('.settings-tab'); tabs.forEach(function(x){x.classList.toggle('active',x.dataset.tab==='appearance');}); var groups=document.querySelectorAll('.setting-group'); groups.forEach(function(g){g.style.display=(g.dataset.tab==='appearance')?'flex':'none';}); }; }
+});
+</script>
+
+
+<script>
+document.addEventListener('click', function(e){
+  if(e.target.id === 'settingsBackdrop' || e.target.closest('#settingsClose')){
+    var b=document.getElementById('settingsBackdrop'); var m=document.getElementById('settingsModal');
+    if(b)b.classList.remove('show'); if(m)m.classList.remove('show');
+  }
+});
+</script>
+
 </body>
 </html>

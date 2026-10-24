@@ -46,6 +46,23 @@ themeBtn.addEventListener('click', () => {
   if (typeof updateSwatchColors === 'function') updateSwatchColors();
 });
 
+// ---------- Animated background cursor glow ----------
+(function initBgGlow() {
+  let frame = null;
+  let mx = 0;
+  let my = 0;
+  window.addEventListener('pointermove', (e) => {
+    mx = e.clientX;
+    my = e.clientY;
+    if (frame) return;
+    frame = requestAnimationFrame(() => {
+      frame = null;
+      document.documentElement.style.setProperty('--mx', mx + 'px');
+      document.documentElement.style.setProperty('--my', my + 'px');
+    });
+  }, { passive: true });
+})();
+
 // ---------- Toast ----------
 let toastTimer = null;
 function toast(msg, ms = 2000) {
@@ -660,7 +677,7 @@ webSearchBtn.addEventListener('click', () => {
   webSearchEnabled = !webSearchEnabled;
   if (webSearchEnabled) deepSearchEnabled = false;
   webSearchBtn.style.opacity = webSearchEnabled ? '1' : '0.5';
-  deepSearchBtn.style.opacity = deepSearchEnabled ? '1' : '0.5';
+  if (deepSearchBtn) deepSearchBtn.style.opacity = deepSearchEnabled ? '1' : '0.5';
   webSearchBtn.setAttribute('aria-pressed', String(webSearchEnabled));
   toast('Web search ' + (webSearchEnabled ? 'on' : 'off'));
 });
@@ -743,12 +760,19 @@ function applyAccent(name) {
 }
 function applyRadius(val) {
   const v = Number(val);
-  const r = v;
-  const lg = Math.round(v * 1.4);
-  const xl = Math.round(v * 2);
-  document.documentElement.style.setProperty('--radius', r + 'px');
-  document.documentElement.style.setProperty('--radius-lg', lg + 'px');
-  document.documentElement.style.setProperty('--radius-xl', xl + 'px');
+  // Scale every radius token from the single slider value. The factors are
+  // chosen so the default (10) reproduces the original design scale:
+  // sm=8, md=12, lg=16, xl=24.
+  const sm = Math.round(v * 0.8);
+  const md = Math.round(v * 1.2);
+  const lg = Math.round(v * 1.6);
+  const xl = Math.round(v * 2.4);
+  const root = document.documentElement;
+  root.style.setProperty('--radius', md + 'px');
+  root.style.setProperty('--radius-sm', sm + 'px');
+  root.style.setProperty('--radius-md', md + 'px');
+  root.style.setProperty('--radius-lg', lg + 'px');
+  root.style.setProperty('--radius-xl', xl + 'px');
   localStorage.setItem('boing-radius', String(v));
   const rv = document.getElementById('radiusValue');
   if (rv) rv.textContent = v + 'px';
@@ -784,13 +808,13 @@ function applyDensity(d) {
   applyDensity(den);
 })();
 
-// swatches
+// radius slider
 const radiusSlider = document.getElementById('radiusSlider');
 if (radiusSlider) {
   const saved = localStorage.getItem('boing-radius') || '10';
   radiusSlider.value = saved;
-  applyRadius(saved);
-  radiusSlider.addEventListener('input', e => applyRadius(e.target.value));
+  if(typeof applyRadius === 'function') applyRadius(saved);
+  radiusSlider.addEventListener('input', e => { if(typeof applyRadius === 'function') applyRadius(e.target.value); });
 }
 const swatchRow = $('#accentSwatches');
 accentPresets.forEach(p => {
@@ -853,41 +877,70 @@ wireSeg('#densitySeg', applyDensity, 'boing-density');
 const shortcutsBackdrop = $('#shortcutsBackdrop');
 const shortcutsModal = $('#shortcutsModal');
 const shortcutsClose = $('#shortcutsClose');
-function openShortcuts() { shortcutsBackdrop.classList.add('show'); shortcutsModal.classList.add('show'); }
-function closeShortcuts() { shortcutsBackdrop.classList.remove('show'); shortcutsModal.classList.remove('show'); }
-shortcutsClose.addEventListener('click', closeShortcuts);
-shortcutsBackdrop.addEventListener('click', closeShortcuts);
+function openShortcuts() {
+  if (shortcutsBackdrop) shortcutsBackdrop.classList.add('show');
+  if (shortcutsModal) shortcutsModal.classList.add('show');
+}
+function closeShortcuts() {
+  if (shortcutsBackdrop) shortcutsBackdrop.classList.remove('show');
+  if (shortcutsModal) shortcutsModal.classList.remove('show');
+}
+if (shortcutsClose) shortcutsClose.addEventListener('click', closeShortcuts);
+if (shortcutsBackdrop) shortcutsBackdrop.addEventListener('click', closeShortcuts);
 
 // settings modal
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsModal = document.getElementById('settingsModal');
 const settingsBackdrop = document.getElementById('settingsBackdrop');
 const settingsClose = document.getElementById('settingsClose');
+
 function openSettings() {
   if(settingsBackdrop) settingsBackdrop.classList.add('show');
   if(settingsModal) settingsModal.classList.add('show');
-  // default tab
   if(typeof switchSettingsTab === 'function') switchSettingsTab('appearance');
+  else {
+    document.querySelectorAll('.settings-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'appearance'));
+    document.querySelectorAll('.setting-group').forEach(g => {
+      g.style.display = (g.dataset.tab === 'appearance') ? 'flex' : 'none';
+    });
+  }
 }
-function switchSettingsTab(tab) {
-  document.querySelectorAll('.settings-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-  document.querySelectorAll('.modal-body .setting-group').forEach(g => {
-    g.style.display = (g.dataset.tab === tab) ? '' : 'none';
-  });
-}
-document.querySelectorAll('.settings-tab').forEach(t => {
-  t.addEventListener('click', () => { if(typeof switchSettingsTab === 'function') switchSettingsTab(t.dataset.tab); });
-});
 function closeSettings() {
   if(settingsBackdrop) settingsBackdrop.classList.remove('show');
   if(settingsModal) settingsModal.classList.remove('show');
 }
-if(settingsBtn) {
-  settingsBtn.onclick = openSettings;
-  settingsBtn.addEventListener('click', openSettings);
+function switchSettingsTab(tab) {
+  document.querySelectorAll('.settings-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.setting-group').forEach(g => {
+    g.style.display = (g.dataset.tab === tab) ? 'flex' : 'none';
+  });
 }
-if(settingsClose) settingsClose.addEventListener('click', closeSettings);
-if(settingsBackdrop) settingsBackdrop.addEventListener('click', closeSettings);
+document.querySelectorAll('.settings-tab').forEach(t => {
+  t.onclick = function(){ switchSettingsTab(this.dataset.tab); };
+  t.addEventListener('click', function(){ switchSettingsTab(this.dataset.tab); });
+});
+if(settingsBtn) {
+  settingsBtn.onclick = function(e){ e.preventDefault(); openSettings(); };
+  settingsBtn.addEventListener('click', function(e){ e.preventDefault(); openSettings(); });
+}
+if(settingsClose) {
+  settingsClose.onclick = closeSettings;
+  settingsClose.addEventListener('click', closeSettings);
+}
+if(settingsBackdrop) {
+  settingsBackdrop.onclick = closeSettings;
+  settingsBackdrop.addEventListener('click', closeSettings);
+}
+// Also attach to any element with data-action=settings
+document.addEventListener('click', function(e){
+  if(e.target.closest('#settingsBtn') || e.target.closest('[data-action="settings"]')) {
+    e.preventDefault();
+    openSettings();
+  }
+  if(e.target.id === 'settingsBackdrop' || e.target.closest('#settingsClose')) {
+    closeSettings();
+  }
+});
 
 // system theme listener
 if (window.matchMedia) {
@@ -1220,14 +1273,19 @@ function notifyComplete(text) {
 function isToggle(key) { return localStorage.getItem(key) === 'on'; }
 function setToggle(key, val) { localStorage.setItem(key, val ? 'on' : 'off'); }
 
-const togTimestamps = $('#togTimestamps');
-const togTokens = $('#togTokens');
-const togNotify = $('#togNotify');
-const togSound = $('#togSound');
-const togLineNums = $('#togLineNums');
-const togWordWrap = $('#togWordWrap');
+const togTimestamps = document.getElementById('togTimestamps');
+const togTokens = document.getElementById('togTokens');
+const togNotify = document.getElementById('togNotify');
+const togSound = document.getElementById('togSound');
+const togLineNums = document.getElementById('togLineNums');
+const togWordWrap = document.getElementById('togWordWrap');
+const togCompact = document.getElementById('togCompact');
+const togAutoScroll = document.getElementById('togAutoScroll');
+const togWebSearch = document.getElementById('togWebSearch');
+const togDeepSearch = document.getElementById('togDeepSearch');
 
 function initToggle(el, key, defaultOn = false) {
+  if(!el) return;
   const on = localStorage.getItem(key) === null ? defaultOn : localStorage.getItem(key) === 'on';
   if (on) el.checked = true;
   el.addEventListener('change', () => setToggle(key, el.checked));
@@ -1238,8 +1296,11 @@ initToggle(togNotify, 'boing-notify', false);
 initToggle(togSound, 'boing-sound', false);
 initToggle(togLineNums, 'boing-linenum', false);
 initToggle(togWordWrap, 'boing-wordwrap', true);
-const togAutoScroll = $('#togAutoScroll');
+initToggle(togCompact, 'boing-compact', false);
 initToggle(togAutoScroll, 'boing-autoscroll', true);
+if(togCompact) togCompact.addEventListener('change', ()=>{document.body.classList.toggle('compact-mode', togCompact.checked); localStorage.setItem('boing-compact', togCompact.checked?'on':'off');});
+if(togWebSearch) togWebSearch.addEventListener('change', ()=>{webSearchEnabled = togWebSearch.checked; if(webSearchBtn) webSearchBtn.style.opacity = webSearchEnabled?'1':'0.5';});
+if(togDeepSearch) togDeepSearch.addEventListener('change', ()=>{deepSearchEnabled = togDeepSearch.checked; if(deepSearchBtn) deepSearchBtn.style.opacity = deepSearchEnabled?'1':'0.5';});
 
 // notification permission
 togNotify.addEventListener('change', () => {
@@ -1582,9 +1643,10 @@ if (layoutEditModeBtn) {
     layoutEditMode = !layoutEditMode;
     layoutEditModeBtn.textContent = layoutEditMode ? 'Disable edit mode' : 'Enable edit mode';
     document.body.classList.toggle('layout-edit-mode', layoutEditMode);
-    setDraggable(layoutEditMode);
-    if (!layoutEditMode) saveLayout(captureLayout());
-    toast('Layout edit mode ' + (layoutEditMode ? 'on' : 'off'));
+    if(typeof setDraggable === 'function') setDraggable(layoutEditMode);
+    if (!layoutEditMode && typeof saveLayout === 'function' && typeof captureLayout === 'function') saveLayout(captureLayout());
+    if(typeof toast === 'function') toast('Layout edit mode ' + (layoutEditMode ? 'on' : 'off'));
+    if(window.layoutStore && typeof window.layoutStore.setEditMode === 'function') window.layoutStore.setEditMode(layoutEditMode);
   });
 }
 
@@ -1739,27 +1801,17 @@ function syncWidgetRemoveButtons() {
 
 // Add "Add widget" controls to manage widgets panel
 (function setupAddWidgetUI() {
+  const addBtn = document.getElementById('addWidgetBtn');
+  if(addBtn) {
+    addBtn.addEventListener('click', () => {
+      const type = document.getElementById('addWidgetType')?.value || 'button';
+      const zone = document.getElementById('addWidgetZone')?.value || '.topbar-actions';
+      if(typeof addWidget === 'function') addWidget(type, zone);
+    });
+  }
   const panel = document.getElementById('manageWidgetsList');
   if (!panel) return;
-  const wrap = document.createElement('div');
-  wrap.style.marginTop = '10px';
-  const sel = document.createElement('select');
-  sel.id = 'addWidgetType';
-  Object.keys(WIDGET_CATALOG).forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = WIDGET_CATALOG[k].label; sel.appendChild(o); });
-  const zoneSel = document.createElement('select');
-  zoneSel.id = 'addWidgetZone';
-  MOVABLE_CONTAINERS.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; zoneSel.appendChild(o); });
-  const btn = document.createElement('button');
-  btn.className = 'seg-btn';
-  btn.textContent = 'Add widget';
-  btn.style.marginLeft = '6px';
-  btn.addEventListener('click', () => addWidget(sel.value, zoneSel.value));
-  wrap.appendChild(sel);
-  wrap.appendChild(zoneSel);
-  wrap.appendChild(btn);
-  panel.parentNode.insertBefore(wrap, panel.nextSibling);
-
-  if (window.layoutStore) window.layoutStore.subscribe(syncWidgetRemoveButtons);
+  if(window.layoutStore) window.layoutStore.subscribe(syncWidgetRemoveButtons);
 })();
 
 // ---------- Extra features batch ----------
@@ -1864,9 +1916,6 @@ inputEl.addEventListener('input', () => {
 function applyCompact() {
   document.body.classList.toggle('compact-mode', isToggle('boing-compact'));
 }
-const togCompact = document.createElement('input');
-togCompact.type = 'checkbox';
-// store not in settings; add to extras mentally. Use localStorage
 if (localStorage.getItem('boing-compact') === 'on') applyCompact();
 
 // 8. Fullscreen toggle
@@ -1991,7 +2040,15 @@ if (memAddBtn) {
 
 // load memories when settings opened
 const settingsBtn2 = document.getElementById('settingsBtn');
-if (settingsBtn2) settingsBtn2.addEventListener('click', () => setTimeout(loadMemories, 200));
+if (settingsBtn2) {
+  settingsBtn2.addEventListener('click', () => setTimeout(loadMemories, 200));
+}
+// also load when clicking memory tab
+document.querySelectorAll('.settings-tab').forEach(t => {
+  t.addEventListener('click', () => {
+    if(t.dataset.tab === 'memory') setTimeout(loadMemories, 100);
+  });
+});
 
 // slash command /remember
 const _origSlash = window.handleSlash;
@@ -2002,22 +2059,104 @@ const _origSlash = window.handleSlash;
   const modal = document.getElementById('nameModal');
   const input = document.getElementById('nameInput');
   const btn = document.getElementById('nameSaveBtn');
+  const closeBtn = document.getElementById('nameCloseBtn');
   if (!backdrop || !modal) return;
-  function show() { backdrop.classList.add('show'); modal.classList.add('show'); }
-  function hide() { backdrop.classList.remove('show'); modal.classList.remove('show'); }
-  if (!localStorage.getItem('boing-username')) {
-    setTimeout(show, 600);
+
+  let username = localStorage.getItem('boing-username') || '';
+  let decided = false;
+  let decidedTimer = null;
+
+  function show() {
+    backdrop.classList.add('show');
+    modal.classList.add('show');
+    setTimeout(() => { if (input) input.focus(); }, 50);
   }
-  if (btn) btn.addEventListener('click', () => {
-    const v = (input.value || '').trim();
-    if (v) localStorage.setItem('boing-username', v);
-    hide();
-    toast('Hi ' + (v || 'there') + '!');
-    // update empty state greeting
+  function hide() {
+    backdrop.classList.remove('show');
+    modal.classList.remove('show');
+  }
+  function updateGreeting(name) {
     const h2 = document.querySelector('.empty-state h2');
-    if (h2 && v) h2.textContent = `How can I help you today, ${v}?`;
+    if (h2 && name) h2.textContent = `How can I help you today, ${name}?`;
+  }
+  function decide() {
+    if (decided) return;
+    decided = true;
+    if (decidedTimer) clearTimeout(decidedTimer);
+    if (username) {
+      updateGreeting(username);
+    } else {
+      setTimeout(show, 400);
+    }
+  }
+
+  // The computer is the source of truth. If the server has no profile yet,
+  // seed it from an older locally stored name.
+  async function loadProfile() {
+    try {
+      const r = await fetch('/api/profile');
+      if (!r.ok) throw new Error('profile unavailable');
+      const p = await r.json();
+      if (p && p.username) {
+        username = p.username;
+        localStorage.setItem('boing-username', username);
+      } else if (username) {
+        await fetch('/api/profile', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username })
+        });
+      }
+    } catch (e) {
+      // Offline fallback: keep using the local copy.
+    }
+    decide();
+  }
+
+  async function saveName() {
+    const v = (input && input.value || '').trim();
+    if (!v) {
+      if (input) input.focus();
+      return;
+    }
+    if (btn) btn.disabled = true;
+    try {
+      const r = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: v })
+      });
+      if (!r.ok) throw new Error('could not save profile');
+      username = v;
+      localStorage.setItem('boing-username', v);
+      updateGreeting(v);
+      hide();
+      toast('Hi ' + v + '!');
+    } catch (e) {
+      // Still save locally so the prompt never traps the user.
+      username = v;
+      localStorage.setItem('boing-username', v);
+      updateGreeting(v);
+      hide();
+      toast('Name saved locally');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  if (btn) btn.addEventListener('click', saveName);
+  if (closeBtn) closeBtn.addEventListener('click', hide);
+  if (input) input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); saveName(); }
+    if (e.key === 'Escape') { e.preventDefault(); hide(); }
   });
-  if (input) input.addEventListener('keydown', (e) => { if (e.key === 'Enter') btn.click(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.classList.contains('show')) hide();
+  });
+
+  loadProfile();
+  // Never leave the user waiting if the profile request hangs.
+  decidedTimer = setTimeout(decide, 2000);
 })();
 
 // Fallback settings button listener
