@@ -482,7 +482,7 @@ async function sendMessage(text) {
     }),
       signal: abortController.signal,
     });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+    if (!r.ok) { const t = await r.text(); throw new Error(t || ('HTTP ' + r.status)); }
     const reader = r.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
@@ -1148,7 +1148,7 @@ document.addEventListener('drop', (e) => {
         const b64 = ev.target.result.split(',')[1];
         pendingImages.push(b64);
         renderImagePreviews();
-        toast('Image attached: ' + file.name);
+        toast('Image attached: ' + file.name + ' (use a vision model like llava for best results)');
       };
       reader.readAsDataURL(file);
     } else {

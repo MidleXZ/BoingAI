@@ -549,10 +549,21 @@ async fn chat(State(s): State<Arc<AppState>>, Json(req): Json<ChatRequest>) -> R
     let ollama_url = format!("{}/api/chat", s.ollama_url);
     let reply_raw = match s.http.post(&ollama_url).json(&ollama_body).send().await {
         Ok(r) => {
-            let v: OllamaChatResp = r.json().await.unwrap_or(OllamaChatResp {
-                message: OllamaMessage { role: "assistant".into(), content: "Sorry, I couldn't generate a reply.".into() },
-            });
-            v.message.content
+            let status = r.status();
+            let text = r.text().await.unwrap_or_default();
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) {
+                if let Some(err) = v.get("error").and_then(|x| x.as_str()) {
+                    return (StatusCode::BAD_GATEWAY, format!("ollama: {err}")).into_response();
+                }
+                if let Some(content) = v.get("message").and_then(|m| m.get("content")).and_then(|c| c.as_str()) {
+                    content.to_string()
+                } else {
+                    "Sorry, I couldn't generate a reply.".to_string()
+                }
+            } else {
+                if !status.is_success() { return (StatusCode::BAD_GATEWAY, format!("ollama: {text}")).into_response(); }
+                text
+            }
         }
         Err(e) => {
             return (StatusCode::BAD_GATEWAY, format!("ollama: {e}")).into_response();
