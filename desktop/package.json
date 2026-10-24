@@ -71,7 +71,9 @@
       "deleteAppDataOnUninstall": false,
       "displayLanguageSelector": true,
       "language": "1033",
-      "multiLanguageInstaller": true
+      "multiLanguageInstaller": true,
+      "installerSidebar": "build/installerSidebar.bmp",
+      "installerHeader": "build/installerHeader.bmp"
     },
     "mac": {
       "target": [
