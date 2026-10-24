@@ -59,6 +59,8 @@ struct ChatRequest {
     web_search: bool,
     #[serde(default)]
     deep_search: bool,
+    #[serde(default)]
+    images: Option<Vec<String>>,
 }
 
 // ----- Web search (DuckDuckGo HTML, no API key required) -----
@@ -522,6 +524,18 @@ async fn chat(State(s): State<Arc<AppState>>, Json(req): Json<ChatRequest>) -> R
     }
     // remove the just-added duplicate? history includes user msg already; fine, Ollama handles. But we added user msg above, so history includes it. Good - no duplicate push needed.
 
+    if let Some(imgs) = &req.images {
+        if !imgs.is_empty() {
+            // attach to last user message
+            for m in messages.iter_mut().rev() {
+                if m.get("role").and_then(|r| r.as_str()) == Some("user") {
+                    m["images"] = serde_json::json!(imgs);
+                    break;
+                }
+            }
+        }
+    }
+
     // call ollama
     let mut ollama_body = serde_json::json!({
         "model": s.model,
@@ -615,6 +629,17 @@ async fn chat_stream(
             for m in conv.messages.iter() {
                 if m.role == "user" || m.role == "assistant" {
                     messages.push(serde_json::json!({"role": m.role, "content": m.content}));
+                }
+            }
+        }
+    }
+
+    if let Some(imgs) = &req.images {
+        if !imgs.is_empty() {
+            for m in messages.iter_mut().rev() {
+                if m.get("role").and_then(|r| r.as_str()) == Some("user") {
+                    m["images"] = serde_json::json!(imgs);
+                    break;
                 }
             }
         }

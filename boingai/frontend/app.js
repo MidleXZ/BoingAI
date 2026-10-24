@@ -478,6 +478,7 @@ async function sendMessage(text) {
       top_p: parseFloat(localStorage.getItem('boing-topp') || '0.9'),
       web_search: webSearchEnabled,
       deep_search: deepSearchEnabled,
+      images: imgs,
     }),
       signal: abortController.signal,
     });
@@ -605,6 +606,9 @@ async function regenerateLast() {
   // re-send by calling sendMessage won't add user msg again; instead call API directly
   isSending = true; sendBtn.disabled = true; showTyping();
   try {
+    const imgs = pendingImages.slice();
+    pendingImages = [];
+    renderImagePreviews();
     const r = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1103,20 +1107,60 @@ renderConvList = async function() {
   });
 };
 
-// ---------- Drag and drop files ----------
+// ---------- Drag and drop files / images ----------
+let pendingImages = [];
+function renderImagePreviews() {
+  let wrap = document.getElementById('imgPreviewWrap');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = 'imgPreviewWrap';
+    wrap.style.cssText = 'display:flex;gap:6px;padding:6px;flex-wrap:wrap;';
+    const composer = document.querySelector('.composer') || document.body;
+    composer.insertBefore(wrap, composer.firstChild);
+  }
+  wrap.innerHTML = '';
+  pendingImages.forEach((b64, i) => {
+    const img = document.createElement('img');
+    img.src = 'data:image/png;base64,' + b64;
+    img.style.cssText = 'width:60px;height:60px;object-fit:cover;border-radius:8px;';
+    const rm = document.createElement('button');
+    rm.textContent = '×';
+    rm.style.cssText = 'position:absolute;margin-left:-18px;margin-top:-6px;background:#0008;color:#fff;border:none;border-radius:50%;width:18px;height:18px;cursor:pointer;';
+    rm.addEventListener('click', () => { pendingImages.splice(i,1); renderImagePreviews(); });
+    const box = document.createElement('div');
+    box.style.position = 'relative';
+    box.appendChild(img);
+    box.appendChild(rm);
+    wrap.appendChild(box);
+  });
+  if (pendingImages.length === 0 && wrap.parentNode) wrap.remove();
+}
+
 document.addEventListener('dragover', (e) => { e.preventDefault(); });
 document.addEventListener('drop', (e) => {
   e.preventDefault();
   const files = e.dataTransfer.files;
   if (!files.length) return;
-  const file = files[0];
-  const reader = new FileReader();
-  reader.onload = (ev) => {
-    inputEl.value = ev.target.result;
-    autoResize();
-    toast('File loaded: ' + file.name);
-  };
-  reader.readAsText(file);
+  Array.from(files).forEach(file => {
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const b64 = ev.target.result.split(',')[1];
+        pendingImages.push(b64);
+        renderImagePreviews();
+        toast('Image attached: ' + file.name);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        inputEl.value = (inputEl.value ? inputEl.value + '\n\n' : '') + '--- ' + file.name + ' ---\n' + ev.target.result;
+        autoResize();
+        toast('File loaded: ' + file.name);
+      };
+      reader.readAsText(file);
+    }
+  });
 });
 
 // ---------- Quick replies ----------
