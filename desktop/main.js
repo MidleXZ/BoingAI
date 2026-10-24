@@ -74,7 +74,7 @@ async function startServices() {
       FRONTEND_DIR: path.join(BOING, 'frontend'),
       CSHARP_URL: 'http://localhost:5001',
       OLLAMA_URL: 'http://localhost:11434',
-      MODEL: 'qwen2.5:1.5b',
+      MODEL: 'minicpm-v4.6:1b',
     }));
     const rustBin = app.isPackaged
       ? path.join(BOING, 'rust-server', 'boingai-server' + EXE)

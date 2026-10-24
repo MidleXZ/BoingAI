@@ -30,7 +30,7 @@ echo "==> Starting Rust server on :8080"
 export FRONTEND_DIR="$BOING/frontend"
 export CSHARP_URL="http://localhost:5001"
 export OLLAMA_URL="http://localhost:11434"
-export MODEL="qwen2.5:1.5b"
+export MODEL="minicpm-v4.6:1b"
 (cd "$BOING/rust-server" && LD_LIBRARY_PATH="$BOING/cpp-lib:${LD_LIBRARY_PATH:-}" ./target/debug/boingai-server) &
 RUST_PID=$!
 

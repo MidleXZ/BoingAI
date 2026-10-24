@@ -21,12 +21,12 @@ Rust server :8080  ──► C++ lib (FFI)        (sanitize / tokens)
         │
         ├──► C# service :5001              (conversations, messages)
         │
-        └──► Ollama :11434  (qwen2.5:1.5b)
+        └──► Ollama :11434  (minicpm-v4.6:1b)
 ```
 
 ## Prerequisites
 
-- Ollama running locally with `qwen2.5:1.5b` pulled (`ollama pull qwen2.5:1.5b`)
+- Ollama running locally with `minicpm-v4.6:1b` pulled (`ollama pull minicpm-v4.6:1b`)
 - Rust toolchain (cargo)
 - g++ (C++17)
 - .NET SDK 10
