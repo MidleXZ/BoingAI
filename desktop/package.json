@@ -43,7 +43,7 @@
         "rpm"
       ],
       "category": "Utility",
-      "icon": "build/icon.png",
+      "icon": "../other/logo.png",
       "maintainer": "BoingAI <hello@boingai.local>",
       "artifactName": "BoingAI-${version}-${arch}.${ext}"
     },
@@ -51,7 +51,7 @@
       "target": [
         "nsis"
       ],
-      "icon": "build/icon.png",
+      "icon": "../other/logo.png",
       "artifactName": "BoingAI-Setup-${version}.${ext}"
     },
     "nsis": {
@@ -61,9 +61,9 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "BoingAI",
-      "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico",
-      "installerHeaderIcon": "build/icon.ico",
+      "installerIcon": "../other/logo.png",
+      "uninstallerIcon": "../other/logo.png",
+      "installerHeaderIcon": "../other/logo.png",
       "license": "LICENSE.electron.txt",
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false,
@@ -79,7 +79,7 @@
         "pkg"
       ],
       "category": "public.app-category.productivity",
-      "icon": "build/icon.png",
+      "icon": "../other/logo.png",
       "identity": null,
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
