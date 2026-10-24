@@ -647,6 +647,11 @@ async fn chat_stream(
 
     if let Some(imgs) = &req.images {
         if !imgs.is_empty() {
+            let ml = s.model.to_lowercase();
+            let vision = ml.contains("llava") || ml.contains("vision") || ml.contains("bakllava") || ml.contains("moondream") || ml.contains("minicpm");
+            if !vision {
+                return (StatusCode::BAD_REQUEST, "The current model does not support images. Switch to a vision model like llava in settings.".to_string()).into_response();
+            }
             for m in messages.iter_mut().rev() {
                 if m.get("role").and_then(|r| r.as_str()) == Some("user") {
                     m["images"] = serde_json::json!(imgs);
