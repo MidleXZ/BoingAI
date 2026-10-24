@@ -6,6 +6,7 @@ builder.WebHost.UseUrls("http://0.0.0.0:5001");
 var app = builder.Build();
 
 var store = new ConcurrentDictionary<string, Conversation>();
+var memories = new ConcurrentDictionary<string, Memory>();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "boingai-memory", version = "1.0.0" }));
 
@@ -32,8 +33,30 @@ app.MapPost("/conversations/{id}/messages", (string id, MessageInput input) =>
 app.MapDelete("/conversations/{id}", (string id) =>
     store.TryRemove(id, out _) ? Results.NoContent() : Results.NotFound());
 
+// Memory endpoints
+app.MapGet("/memories", () => Results.Ok(memories.Values.OrderBy(m => m.CreatedAt).ToList()));
+
+app.MapPost("/memories", (MemoryInput input) =>
+{
+    var m = new Memory(Guid.NewGuid().ToString("N"), input.Key, input.Value, DateTime.UtcNow);
+    memories[m.Id] = m;
+    return Results.Created($"/memories/{m.Id}", m);
+});
+
+app.MapPut("/memories/{id}", (string id, MemoryInput input) =>
+{
+    if (!memories.TryGetValue(id, out var existing)) return Results.NotFound();
+    memories[id] = new Memory(id, input.Key, input.Value, existing.CreatedAt);
+    return Results.Ok(memories[id]);
+});
+
+app.MapDelete("/memories/{id}", (string id) =>
+    memories.TryRemove(id, out _) ? Results.NoContent() : Results.NotFound());
+
 app.Run();
 
 record Message(string Role, string Content, DateTime Timestamp);
 record MessageInput(string Role, string Content);
 record Conversation(string Id, DateTime CreatedAt, List<Message> Messages);
+record Memory(string Id, string Key, string Value, DateTime CreatedAt);
+record MemoryInput(string Key, string Value);

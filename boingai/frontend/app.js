@@ -1887,3 +1887,55 @@ document.addEventListener('keydown', (e) => {
     toast('Theme: ' + next);
   }
 });
+
+// ---------- Memory management ----------
+async function loadMemories() {
+  const el = document.getElementById('memList');
+  if (!el) return;
+  try {
+    const r = await fetch('/api/memories');
+    const mems = await r.json();
+    el.innerHTML = '';
+    mems.forEach(m => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border,rgba(0,0,0,0.08));';
+      row.innerHTML = `<strong>${m.key}</strong>: ${m.value}`;
+      const del = document.createElement('button');
+      del.className = 'msg-action';
+      del.textContent = 'Delete';
+      del.addEventListener('click', async () => {
+        await fetch('/api/memories/' + m.id, { method: 'DELETE' });
+        loadMemories();
+        toast('Memory deleted');
+      });
+      row.appendChild(del);
+      el.appendChild(row);
+    });
+    if (mems.length === 0) el.textContent = 'No memories yet.';
+  } catch (e) { el.textContent = 'Memory service unavailable.'; }
+}
+
+const memAddBtn = document.getElementById('memAddBtn');
+if (memAddBtn) {
+  memAddBtn.addEventListener('click', async () => {
+    const key = document.getElementById('memKey').value.trim();
+    const val = document.getElementById('memVal').value.trim();
+    if (!key || !val) { toast('Enter key and value'); return; }
+    await fetch('/api/memories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value: val }),
+    });
+    document.getElementById('memKey').value = '';
+    document.getElementById('memVal').value = '';
+    loadMemories();
+    toast('Memory saved');
+  });
+}
+
+// load memories when settings opened
+const settingsBtn2 = document.getElementById('settingsBtn');
+if (settingsBtn2) settingsBtn2.addEventListener('click', () => setTimeout(loadMemories, 200));
+
+// slash command /remember
+const _origSlash = window.handleSlash;

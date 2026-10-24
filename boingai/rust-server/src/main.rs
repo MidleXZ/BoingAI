@@ -358,6 +358,36 @@ struct OllamaChatResp {
     message: OllamaMessage,
 }
 
+async fn list_memories(State(s): State<Arc<AppState>>) -> Response {
+    let url = format!("{}/memories", s.csharp_url);
+    match s.http.get(&url).send().await {
+        Ok(r) => {
+            let body: serde_json::Value = r.json().await.unwrap_or(serde_json::json!([]));
+            Json(body).into_response()
+        }
+        Err(e) => (StatusCode::BAD_GATEWAY, format!("memory: {e}")).into_response(),
+    }
+}
+
+async fn add_memory(State(s): State<Arc<AppState>>, Json(body): Json<serde_json::Value>) -> Response {
+    let url = format!("{}/memories", s.csharp_url);
+    match s.http.post(&url).json(&body).send().await {
+        Ok(r) => {
+            let v: serde_json::Value = r.json().await.unwrap_or(serde_json::json!({}));
+            Json(v).into_response()
+        }
+        Err(e) => (StatusCode::BAD_GATEWAY, format!("memory: {e}")).into_response(),
+    }
+}
+
+async fn delete_memory(State(s): State<Arc<AppState>>, Path(id): Path<String>) -> Response {
+    let url = format!("{}/memories/{}", s.csharp_url, id);
+    match s.http.delete(&url).send().await {
+        Ok(_) => StatusCode::NO_CONTENT.into_response(),
+        Err(e) => (StatusCode::BAD_GATEWAY, format!("memory: {e}")).into_response(),
+    }
+}
+
 async fn health(State(s): State<Arc<AppState>>) -> impl IntoResponse {
     let v = unsafe {
         CStr::from_ptr(boing_version()).to_string_lossy().into_owned()
@@ -419,13 +449,29 @@ async fn delete_conversation(State(s): State<Arc<AppState>>, Path(id): Path<Stri
     }
 }
 
+async fn memory_context(s: &Arc<AppState>) -> String {
+    let url = format!("{}/memories", s.csharp_url);
+    let Ok(resp) = s.http.get(&url).send().await else { return String::new(); };
+    let Ok(mems) = resp.json::<Vec<serde_json::Value>>().await else { return String::new(); };
+    if mems.is_empty() { return String::new(); }
+    let mut ctx = String::from("\n\nYou have the following saved memories about the user. Use them when relevant:\n");
+    for m in mems {
+        let key = m.get("key").and_then(|x| x.as_str()).unwrap_or("");
+        let val = m.get("value").and_then(|x| x.as_str()).unwrap_or("");
+        if !key.is_empty() {
+            ctx.push_str(&format!("- {}: {}\n", key, val));
+        }
+    }
+    ctx
+}
+
 async fn chat(State(s): State<Arc<AppState>>, Json(req): Json<ChatRequest>) -> Response {
     let user_text = cpp_sanitize(&req.message);
     let tokens_in = cpp_tokens(&user_text);
 
     // Optional web search / deep research: prepend results to the system prompt
     let base = req.system_prompt.clone().unwrap_or_else(|| "You are BoingAI, a helpful, concise and friendly assistant. Keep answers clear and minimal.".to_string());
-    let sys = if req.deep_search {
+    let mut sys = if req.deep_search {
         base + &deep_search_context(&s.http, &user_text).await
     } else if req.web_search {
         let limit = 5usize;
@@ -434,6 +480,7 @@ async fn chat(State(s): State<Arc<AppState>>, Json(req): Json<ChatRequest>) -> R
     } else {
         base
     };
+    sys.push_str(&memory_context(&s).await);
 
     // Resolve conversation id
     let conv_id = match req.conversation_id.clone() {
@@ -521,7 +568,7 @@ async fn chat_stream(
 
     // Optional web search / deep research: prepend results to the system prompt
     let base = req.system_prompt.clone().unwrap_or_else(|| "You are BoingAI, a helpful, concise and friendly assistant. Keep answers clear and minimal.".to_string());
-    let sys = if req.deep_search {
+    let mut sys = if req.deep_search {
         base + &deep_search_context(&s.http, &user_text).await
     } else if req.web_search {
         let limit = 5usize;
@@ -530,6 +577,7 @@ async fn chat_stream(
     } else {
         base
     };
+    sys.push_str(&memory_context(&s).await);
 
     // Resolve conversation id
     let conv_id = match req.conversation_id.clone() {
@@ -655,6 +703,8 @@ async fn main() {
         .route("/api/chat", post(chat))
         .route("/api/chat/stream", post(chat_stream))
         .route("/api/search", post(web_search))
+        .route("/api/memories", get(list_memories).post(add_memory))
+        .route("/api/memories/:id", delete(delete_memory))
         .route("/api/window/minimize", post(window_minimize))
         .route("/api/window/close", post(window_close))
         .nest_service("/static", ServeDir::new(&frontend_dir))
