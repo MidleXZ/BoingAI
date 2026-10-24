@@ -1705,3 +1705,185 @@ function syncWidgetRemoveButtons() {
 
   if (window.layoutStore) window.layoutStore.subscribe(syncWidgetRemoveButtons);
 })();
+
+// ---------- Extra features batch ----------
+// 1. Prompt history (up/down arrows)
+const promptHistory = JSON.parse(localStorage.getItem('boing-prompt-history') || '[]');
+let promptHistoryIdx = -1;
+inputEl.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowUp' && (inputEl.selectionStart === 0 && inputEl.selectionEnd === 0)) {
+    if (promptHistory.length === 0) return;
+    if (promptHistoryIdx === -1) promptHistoryIdx = promptHistory.length - 1;
+    else promptHistoryIdx = Math.max(0, promptHistoryIdx - 1);
+    inputEl.value = promptHistory[promptHistoryIdx];
+    autoResize();
+    e.preventDefault();
+  } else if (e.key === 'ArrowDown' && promptHistoryIdx !== -1) {
+    promptHistoryIdx++;
+    if (promptHistoryIdx >= promptHistory.length) { promptHistoryIdx = -1; inputEl.value = ''; }
+    else inputEl.value = promptHistory[promptHistoryIdx];
+    autoResize();
+    e.preventDefault();
+  }
+});
+const _origSend2 = sendMessage;
+// wrap to record history
+const _sendWrap = sendMessage;
+// monkey: record on send via event listener on sendBtn already calls sendMessage; instead hook sendMessage by redefining? sendMessage is const-ish function decl (hoisted). We'll patch by wrapping calls impossible. Instead record in a wrapper used by sendBtn.
+// Re-bind sendBtn
+sendBtn.removeEventListener('click', () => sendMessage(inputEl.value));
+sendBtn.addEventListener('click', () => {
+  const t = inputEl.value.trim();
+  if (t) { promptHistory.push(t); if (promptHistory.length > 50) promptHistory.shift(); localStorage.setItem('boing-prompt-history', JSON.stringify(promptHistory)); promptHistoryIdx = -1; }
+  sendMessage(t);
+});
+
+// 2. Scroll to bottom button (reuse existing)
+
+// 3. Auto-scroll pause on manual scroll up
+let autoScroll = true;
+messagesEl.addEventListener('scroll', () => {
+  const nearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 120;
+  autoScroll = nearBottom;
+});
+// patch appendMessage scroll? We'll hook via MutationObserver
+const mo = new MutationObserver(() => {
+  if (autoScroll && isToggle('boing-autoscroll')) messagesEl.scrollTop = messagesEl.scrollHeight;
+});
+mo.observe(messagesEl, { childList: true, subtree: true });
+
+// 4. Message reactions
+function addReactions(msgEl, content) {
+  if (!msgEl.classList.contains('assistant')) return;
+  const r = document.createElement('div');
+  r.className = 'msg-reactions';
+  r.style.cssText = 'display:flex;gap:4px;margin-top:4px;';
+  ['👍','👎','❤️','😂'].forEach(emoji => {
+    const b = document.createElement('button');
+    b.className = 'msg-action';
+    b.textContent = emoji;
+    b.addEventListener('click', () => {
+      const key = 'boing-reactions';
+      const store = JSON.parse(localStorage.getItem(key) || '{}');
+      const id = msgEl.dataset.msgId || (msgEl.dataset.msgId = 'm' + Date.now());
+      store[id] = store[id] === emoji ? null : emoji;
+      localStorage.setItem(key, JSON.stringify(store));
+      r.querySelectorAll('button').forEach(x => x.style.opacity = x.textContent === store[id] ? '1' : '0.5');
+      toast('Reacted ' + emoji);
+    });
+    r.appendChild(b);
+  });
+  msgEl.querySelector('.bubble-wrap').appendChild(r);
+}
+const mo2 = new MutationObserver(muts => {
+  muts.forEach(m => m.addedNodes.forEach(n => {
+    if (n.classList && n.classList.contains('msg') && n.classList.contains('assistant')) addReactions(n);
+  }));
+});
+mo2.observe(messagesEl, { childList: true });
+
+// 5. Connection status indicator
+const statusDot = document.createElement('span');
+statusDot.style.cssText = 'width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;margin-right:6px;';
+const modelPill = document.querySelector('.model-pill .dot');
+if (modelPill) modelPill.replaceWith(statusDot);
+async function checkConn() {
+  try {
+    const r = await fetch('/api/health').catch(() => fetch('/'));
+    statusDot.style.background = r && r.ok ? '#22c55e' : '#ef4444';
+  } catch (e) { statusDot.style.background = '#ef4444'; }
+}
+setInterval(checkConn, 15000); checkConn();
+
+// 6. Token counter in input
+const tokenCounter = document.createElement('span');
+tokenCounter.style.cssText = 'font-size:11px;color:var(--text-muted);margin-left:8px;';
+inputEl.parentNode && inputEl.parentNode.appendChild(tokenCounter);
+inputEl.addEventListener('input', () => {
+  const words = inputEl.value.trim().split(/\s+/).filter(Boolean).length;
+  tokenCounter.textContent = words ? `~${words} words` : '';
+});
+
+// 7. Compact mode toggle
+function applyCompact() {
+  document.body.classList.toggle('compact-mode', isToggle('boing-compact'));
+}
+const togCompact = document.createElement('input');
+togCompact.type = 'checkbox';
+// store not in settings; add to extras mentally. Use localStorage
+if (localStorage.getItem('boing-compact') === 'on') applyCompact();
+
+// 8. Fullscreen toggle
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'F11') { e.preventDefault(); if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }
+});
+
+// 9. Print conversation
+const printBtn = document.createElement('button');
+printBtn.className = 'footer-btn';
+printBtn.textContent = '🖨 Print';
+printBtn.addEventListener('click', () => window.print());
+const footerActions = document.querySelector('.footer-actions');
+if (footerActions) footerActions.appendChild(printBtn);
+
+// 10. Message timestamp toggle already; add relative time helper
+function relativeTime(ts) {
+  const diff = (Date.now() - ts) / 1000;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  return Math.floor(diff/86400) + 'd ago';
+}
+
+// 11. Edit message (double-click user bubble)
+messagesEl.addEventListener('dblclick', (e) => {
+  const bubble = e.target.closest('.msg.user .bubble');
+  if (!bubble) return;
+  const orig = bubble.textContent;
+  const ta = document.createElement('textarea');
+  ta.value = orig;
+  ta.style.cssText = 'width:100%;min-height:60px;';
+  bubble.replaceWith(ta);
+  ta.focus();
+  const save = () => {
+    const nb = document.createElement('div');
+    nb.className = 'bubble';
+    nb.textContent = ta.value;
+    ta.replaceWith(nb);
+    toast('Message edited (not re-sent)');
+  };
+  ta.addEventListener('blur', save);
+  ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey||e.ctrlKey)) { e.preventDefault(); save(); } });
+});
+
+// 12. Retry last failed - add button to empty? skip
+
+// 13. Zoom
+let zoom = parseFloat(localStorage.getItem('boing-zoom') || '1');
+document.documentElement.style.zoom = zoom;
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey||e.metaKey) && (e.key === '=' || e.key === '+')) { e.preventDefault(); zoom = Math.min(2, zoom + 0.1); document.documentElement.style.zoom = zoom; localStorage.setItem('boing-zoom', zoom); }
+  if ((e.ctrlKey||e.metaKey) && e.key === '-') { e.preventDefault(); zoom = Math.max(0.5, zoom - 0.1); document.documentElement.style.zoom = zoom; localStorage.setItem('boing-zoom', zoom); }
+  if ((e.ctrlKey||e.metaKey) && e.key === '0') { e.preventDefault(); zoom = 1; document.documentElement.style.zoom = zoom; localStorage.setItem('boing-zoom', zoom); }
+});
+
+// 14. Conversation tags
+function tagConversation(id, tag) {
+  const tags = JSON.parse(localStorage.getItem('boing-tags') || '{}');
+  if (!tags[id]) tags[id] = [];
+  if (!tags[id].includes(tag)) tags[id].push(tag);
+  localStorage.setItem('boing-tags', JSON.stringify(tags));
+  toast('Tagged: ' + tag);
+}
+
+// 15. Quick theme preset cycle
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.key.toLowerCase() === 't') {
+    e.preventDefault();
+    const modes = ['light', 'dark', 'system'];
+    const cur = localStorage.getItem('boing-theme-mode') || 'system';
+    const next = modes[(modes.indexOf(cur) + 1) % modes.length];
+    if (typeof applyThemeMode === 'function') applyThemeMode(next);
+    toast('Theme: ' + next);
+  }
+});
